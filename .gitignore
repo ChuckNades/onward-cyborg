@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 .worktrees/
 # NOTE: .loop-ledger/ is a deliverable — do NOT ignore it.
+
+# orchestrator pump loop log (not a deliverable)
+.loop-ledger/PUMP.log

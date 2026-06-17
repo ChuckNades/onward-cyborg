@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1080, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Cyborg</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- DOM-light static shell. app.js fills text nodes only; no framework, no build step. -->
+  <div id="cyborg-root" class="screen" data-state="syncing">
+
+    <header class="hdr">
+      <div class="brand">
+        <!-- ORIGINAL placeholder mark. Real (trademarked) art is loaded at runtime from the
+             git-ignored assets/ dir by theme.js, with a silent fallback to this glyph. -->
+        <span id="brand-mark" class="brand-mark" aria-hidden="true">C</span>
+        <span class="brand-name">CYBORG</span>
+      </div>
+      <div class="clock">
+        <span id="clock-time" class="clock-time">--:--</span>
+        <span id="clock-date" class="clock-date">&nbsp;</span>
+      </div>
+    </header>
+
+    <!-- NOW / NEXT emphasis block (driven by /api/agenda .next) -->
+    <section id="nownext" class="nownext" hidden>
+      <div class="nownext-label">NEXT UP</div>
+      <div class="nownext-card">
+        <span id="nownext-stripe" class="stripe"></span>
+        <div class="nownext-body">
+          <div id="nownext-title" class="nownext-title"></div>
+          <div id="nownext-when" class="nownext-when"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Agenda list (capped to MAX_VISIBLE_ROWS in app.js) -->
+    <main class="agenda">
+      <div class="agenda-head">TODAY &amp; UPCOMING</div>
+      <ul id="agenda-list" class="agenda-list"></ul>
+      <div id="agenda-empty" class="agenda-empty" hidden>No upcoming events. Cyborg is standing by.</div>
+    </main>
+
+    <!-- First-boot / syncing overlay (tier=syncing). Never a blank screen. -->
+    <div id="syncing" class="syncing">
+      <div class="syncing-eye" aria-hidden="true"></div>
+      <div class="syncing-text">BOOTING UP&hellip; syncing the family calendar.</div>
+    </div>
+
+    <!-- Persistent in-character staleness chip (hidden when fresh) -->
+    <footer class="statusbar">
+      <span id="status-chip" class="status-chip" hidden></span>
+    </footer>
+
+  </div>
+
+  <!-- Theming/celebration/BOOYAH lives ONLY in theme.js (the section 13 invariant surface).
+       app.js handles data/rendering and passes ONLY system state to theme.js. -->
+  <script src="/theme.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

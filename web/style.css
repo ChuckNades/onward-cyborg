@@ -1,0 +1,115 @@
+/* Cyborg kiosk — portrait 1080x1920. DOM-light, ANIMATION-FREE per PRD section 13 / perf
+   contract section I (no keyframes, no animated motion, no CSS transitions, no heavy shadow).
+   Blue/silver cybernetic palette, high contrast, sized for ~10 ft legibility. ORIGINAL art. */
+
+:root {
+  --bg: #06111c;
+  --bg-panel: #0d1f30;
+  --silver: #c7d3dc;
+  --silver-dim: #7e8c98;
+  --cyan: #18b4e9;
+  --cyan-bright: #4fd6ff;
+  --accent: #2b6cff;
+  --text: #eaf3f8;
+  --warn: #ffb84d;
+  --danger: #ff6b5e;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 1080px;
+  height: 1920px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.screen {
+  width: 1080px;
+  height: 1920px;
+  display: flex;
+  flex-direction: column;
+  padding: 36px 40px;
+}
+
+/* ---- Header / brand ---- */
+.hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 4px solid var(--cyan);
+  padding-bottom: 22px;
+}
+.brand { display: flex; align-items: center; gap: 22px; }
+.brand-mark {
+  width: 96px; height: 96px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 64px; font-weight: 800; color: var(--bg);
+  background: var(--cyan); border: 4px solid var(--silver);
+  border-radius: 18px;
+}
+.brand-mark.has-art { background: transparent; border-color: transparent; color: transparent; }
+.brand-name { font-size: 60px; font-weight: 800; letter-spacing: 6px; color: var(--silver); }
+.clock { text-align: right; }
+.clock-time { display: block; font-size: 76px; font-weight: 800; color: var(--cyan-bright); }
+.clock-date { display: block; font-size: 32px; color: var(--silver-dim); letter-spacing: 2px; }
+
+/* ---- NOW / NEXT ---- */
+.nownext { margin-top: 30px; }
+.nownext-label { font-size: 30px; letter-spacing: 6px; color: var(--cyan); margin-bottom: 12px; }
+.nownext-card {
+  display: flex; align-items: stretch; gap: 20px;
+  background: var(--bg-panel); border: 3px solid var(--accent);
+  border-radius: 18px; padding: 28px 30px;
+}
+.nownext-title { font-size: 58px; font-weight: 800; line-height: 1.05; }
+.nownext-when { font-size: 38px; color: var(--silver); margin-top: 10px; }
+
+/* ---- Agenda ---- */
+.agenda { margin-top: 38px; flex: 1; min-height: 0; }
+.agenda-head { font-size: 30px; letter-spacing: 6px; color: var(--cyan); margin-bottom: 16px; }
+.agenda-list { list-style: none; margin: 0; padding: 0; }
+.agenda-row {
+  display: flex; align-items: center; gap: 22px;
+  padding: 22px 18px;
+  border-bottom: 2px solid #163047;
+}
+.agenda-row.dimmed { opacity: 0.45; }
+.stripe { width: 14px; align-self: stretch; min-height: 56px; border-radius: 8px; background: var(--silver-dim); }
+.row-time { width: 220px; font-size: 36px; font-weight: 700; color: var(--cyan-bright); }
+.row-time .allday { font-size: 28px; color: var(--silver); letter-spacing: 2px; }
+.row-body { flex: 1; min-width: 0; }
+.row-title { font-size: 42px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-cal { font-size: 26px; color: var(--silver-dim); margin-top: 4px; }
+.row-badge { font-size: 24px; color: var(--warn); margin-left: 12px; }
+.agenda-empty { font-size: 40px; color: var(--silver-dim); padding: 40px 18px; }
+
+/* ---- Syncing (first boot) overlay ---- */
+.syncing {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 40px;
+}
+.screen[data-state="ready"] .syncing { display: none; }
+.syncing-eye {
+  width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--cyan-bright) 0 38%, var(--bg) 40% 60%, var(--cyan) 62% 100%);
+  border: 8px solid var(--silver);
+}
+.syncing-text { font-size: 44px; color: var(--silver); text-align: center; max-width: 760px; }
+
+/* ---- Status bar / staleness chip ---- */
+.statusbar { padding-top: 20px; min-height: 60px; }
+.status-chip {
+  display: inline-block;
+  font-size: 30px; padding: 12px 24px; border-radius: 999px;
+  background: var(--bg-panel); color: var(--warn); border: 2px solid var(--warn);
+}
+.status-chip.tier-on-backup { color: var(--danger); border-color: var(--danger); }
+.status-chip.tier-syncing { color: var(--cyan-bright); border-color: var(--cyan); }
