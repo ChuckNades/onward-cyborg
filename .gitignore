@@ -1,0 +1,10 @@
+# Trademarked TTG/Cyborg art — on-device only, never committed (PRD R2)
+assets/
+*.secret
+config.local.*
+.env
+node_modules/
+__pycache__/
+*.pyc
+.worktrees/
+# NOTE: .loop-ledger/ is a deliverable — do NOT ignore it.
