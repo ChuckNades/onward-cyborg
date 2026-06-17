@@ -1,0 +1,10 @@
+[Unit]
+Description=Turn off Cyborg kiosk screen overnight
+
+[Service]
+Type=oneshot
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=@CYBORG_KIOSK_HOME@/.Xauthority
+ExecStart=/bin/sh -lc 'xset dpms force off || xrandr --output HDMI-1 --off || tvservice -o'
+User=@CYBORG_KIOSK_USER@
+Group=@CYBORG_KIOSK_USER@

@@ -1,0 +1,10 @@
+[Unit]
+Description=Morning Cyborg screen on timer
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+Unit=cyborg-screen-on.service
+
+[Install]
+WantedBy=timers.target
