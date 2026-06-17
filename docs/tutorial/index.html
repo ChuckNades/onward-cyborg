@@ -479,12 +479,14 @@ sudo mount /dev/sda1 /mnt/cyborg
 sudo mkdir -p /mnt/cyborg/cyborg-cache
 sudo chown -R pi:pi /mnt/cyborg/cyborg-cache
 blkid /dev/sda1     # shows UUID=... LABEL="CYBORG"</code></pre></div></div>
-    <div class="step"><input type="checkbox" data-k="m5-4"><div>Run Cyborg by hand again and watch the cache file appear:
+    <div class="step"><input type="checkbox" data-k="m5-4"><div>Run Cyborg by hand again, watch the cache file appear, then check the calendar <b>while it's still running</b>:
       <pre><code>cd ~/onward-cyborg
 .venv/bin/python -m cyborg_core --config config.local.toml &amp;
 sleep 8
-ls -l /mnt/cyborg/cyborg-cache/    # you should see last-known-good.json
-kill %1</code></pre></div></div>
+ls -l /mnt/cyborg/cyborg-cache/    # you should see last-known-good.json</code></pre>
+      <b>Leave it running</b> and open <code>http://cyborg.local:8765/</code> in a browser — your events
+      should now show. <b>Once you've seen them</b>, stop the test server:
+      <pre><code>kill %1</code></pre></div></div>
     <div class="know"><code>blkid</code> shows <code>LABEL="CYBORG"</code>; after running, a file
       <code>last-known-good.json</code> appears in <code>/mnt/cyborg/cyborg-cache/</code>; and now the
       calendar page at <code>http://cyborg.local:8765/</code> finally shows <b>your events</b> — Cyborg
