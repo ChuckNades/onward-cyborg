@@ -1,0 +1,26 @@
+[service]
+home_tz = "America/Chicago"
+poll_seconds = 300
+lookahead_days = 45
+host = "127.0.0.1"
+port = 8765
+
+[cache]
+primary_path = "/mnt/cyborg/cyborg-cache/last-known-good.json"
+fallback_path = "/opt/cyborg-core/fallback/last-known-good.json"
+
+[behavior]
+show_tentative = true
+hide_declined = true
+
+[[calendars]]
+id = "family"
+name = "Family"
+url = "https://pXX-caldav.icloud.com/published/2/example-family-secret"
+color = "#4C78A8"
+
+[[calendars]]
+id = "school"
+name = "School"
+url = "https://pXX-caldav.icloud.com/published/2/example-school-secret"
+color = "#F58518"
