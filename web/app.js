@@ -48,22 +48,6 @@
     return h12 + ":" + m + " " + ampm;
   }
 
-  function offsetMinutes(iso) {
-    var m = String(iso).match(/([+-])(\d{2}):(\d{2})$/);
-    if (!m) return 0;
-    var sign = m[1] === "-" ? -1 : 1;
-    return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
-  }
-
-  function updatedLabel(nowIso, ageSeconds) {
-    if (ageSeconds == null) return "just now";
-    var off = offsetMinutes(nowIso);
-    var ms = Date.parse(nowIso) - ageSeconds * 1000;
-    if (isNaN(ms)) return "recently";
-    var local = new Date(ms + off * 60000); // shift so UTC fields == home wall time
-    return fmt12(local.getUTCHours(), pad2(local.getUTCMinutes()));
-  }
-
   function weekdayDate(iso) {
     var d = new Date((iso || "").split("T")[0] + "T00:00:00");
     if (isNaN(d.getTime())) return "";
@@ -140,8 +124,9 @@
 
   function renderStatus(staleness, nowIso) {
     var tier = (staleness && staleness.tier) || "syncing";
-    var label = updatedLabel(nowIso, staleness ? staleness.age_seconds : null);
-    var chip = CyborgTheme.staleChip(tier, label); // theming copy lives in theme.js
+    var age = staleness ? staleness.age_seconds : null;
+    // Pass ONLY system state to the theming surface: tier + system clock + staleness age.
+    var chip = CyborgTheme.staleChip(tier, nowIso, age); // theme.js builds the label itself
     if (!chip) { els.chip.hidden = true; els.chip.className = "status-chip"; return; }
     els.chip.hidden = false;
     els.chip.className = "status-chip " + (chip.cls || "");

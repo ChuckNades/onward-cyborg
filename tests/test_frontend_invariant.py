@@ -70,6 +70,22 @@ def test_style_css_is_animation_free():
         assert banned not in css, f"animation-free budget violated: {banned}"
 
 
+def test_staleness_label_is_computed_inside_theme_from_system_time_only():
+    # Closes the staleChip-label loophole (cross-vendor review, cycle 2): the theming surface
+    # must build its 'updated' label from SYSTEM time itself, not accept caller free-text that
+    # could carry event content.
+    theme = _read("theme.js")
+    app = _read("app.js")
+    assert "function updatedLabel" in theme, "theme.js must own the label computation"
+    assert "Date.parse" in theme and "offsetMinutes" in theme, "label must derive from system time"
+    m = re.search(r"CyborgTheme\.staleChip\(([^)]*)\)", app)
+    assert m, "app.js must call CyborgTheme.staleChip"
+    args = m.group(1)
+    assert "tier" in args, "first arg is the system staleness tier"
+    for token in ["title", "summary", "ev.", "event", ".color", "events"]:
+        assert token not in args, f"theming call must not pass event data: {token}"
+
+
 def test_app_js_caps_the_dom_with_a_named_constant():
     app = _read("app.js")
     assert "MAX_VISIBLE_ROWS" in app

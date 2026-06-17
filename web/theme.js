@@ -52,19 +52,44 @@
     playBooyah();
   }
 
-  // In-character staleness chip copy, keyed ONLY on the system tier + a system timestamp label.
-  function staleChip(tier, updatedLabel) {
+  // --- system-time helpers: the staleness label is built ONLY from system time (now ISO +
+  //     staleness age in seconds). No caller-supplied free text, so no event content can leak
+  //     into the theming surface (closes the staleChip-label loophole). ---
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function fmt12(h, m) {
+    var ampm = h >= 12 ? "PM" : "AM";
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ":" + m + " " + ampm;
+  }
+  function offsetMinutes(iso) {
+    var m = String(iso).match(/([+-])(\d{2}):(\d{2})$/);
+    if (!m) return 0;
+    var sign = m[1] === "-" ? -1 : 1;
+    return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+  }
+  function updatedLabel(nowIso, ageSeconds) {
+    if (ageSeconds == null) return "just now";
+    var ms = Date.parse(nowIso) - ageSeconds * 1000;
+    if (isNaN(ms)) return "recently";
+    var local = new Date(ms + offsetMinutes(nowIso) * 60000); // home wall time via the ISO offset
+    return fmt12(local.getUTCHours(), pad2(local.getUTCMinutes()));
+  }
+
+  // In-character staleness chip copy. Inputs are ONLY system state: the tier string, the
+  // system clock (now ISO) and the staleness age in seconds. theme.js computes the label itself.
+  function staleChip(tier, nowIso, ageSeconds) {
+    var updatedLabel_ = updatedLabel(nowIso, ageSeconds);
     switch (tier) {
       case "fresh":
         return null; // no chip when fresh
       case "stale":
-        return { text: "Cyborg synced · updated " + updatedLabel, cls: "tier-stale" };
+        return { text: "Cyborg synced · updated " + updatedLabel_, cls: "tier-stale" };
       case "on-backup":
-        return { text: "Cyborg is running on backup memory · updated " + updatedLabel, cls: "tier-on-backup" };
+        return { text: "Cyborg is running on backup memory · updated " + updatedLabel_, cls: "tier-on-backup" };
       case "syncing":
         return { text: "Cyborg is waking up… syncing the family calendar", cls: "tier-syncing" };
       default:
-        return { text: "Cyborg · updated " + updatedLabel, cls: "" };
+        return { text: "Cyborg · updated " + updatedLabel_, cls: "" };
     }
   }
 
