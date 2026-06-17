@@ -1,0 +1,13 @@
+[Unit]
+Description=Cyborg GPIO17 clean shutdown button
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/cyborg-core/scripts/shutdown_button.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

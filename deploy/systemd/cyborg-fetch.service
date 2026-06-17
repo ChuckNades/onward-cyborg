@@ -1,0 +1,22 @@
+[Unit]
+Description=Cyborg calendar fetch and local HTTP service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cyborg
+Group=cyborg
+WorkingDirectory=/opt/cyborg-core
+ExecStart=/opt/cyborg-core/.venv/bin/python -m cyborg_core --config /etc/cyborg/config.local.toml
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/mnt/cyborg /opt/cyborg-core/fallback /etc/cyborg
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

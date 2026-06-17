@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+export DISPLAY="${DISPLAY:-:0}"
+HDMI_OUTPUT="${CYBORG_HDMI_OUTPUT:-HDMI-1}"
+TOUCH_DEVICE="${CYBORG_TOUCH_DEVICE:-Acer UT222Q}"
+
+xrandr --output "$HDMI_OUTPUT" --rotate left || true
+xinput set-prop "$TOUCH_DEVICE" "Coordinate Transformation Matrix" 0 -1 1 1 0 0 0 0 1 || true
+unclutter -idle 0.5 -root &
+
+chromium-browser \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --incognito \
+  --disable-extensions \
+  --disable-gpu-compositing \
+  --disable-features=Translate \
+  --check-for-update-interval=31536000 \
+  --overscroll-history-navigation=0 \
+  --force-device-scale-factor=1 \
+  http://127.0.0.1:8765/

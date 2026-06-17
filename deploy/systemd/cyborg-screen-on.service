@@ -1,0 +1,10 @@
+[Unit]
+Description=Turn on Cyborg kiosk screen in the morning
+
+[Service]
+Type=oneshot
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/cyborg/.Xauthority
+ExecStart=/bin/sh -lc 'xrandr --output HDMI-1 --auto --rotate left || tvservice -p; xset dpms force on'
+User=cyborg
+Group=cyborg
