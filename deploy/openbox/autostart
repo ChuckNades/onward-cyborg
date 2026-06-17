@@ -17,6 +17,7 @@ chromium-browser \
   --disable-extensions \
   --disable-gpu-compositing \
   --disable-features=Translate \
+  --autoplay-policy=no-user-gesture-required \
   --check-for-update-interval=31536000 \
   --overscroll-history-navigation=0 \
   --force-device-scale-factor=1 \
