@@ -4,6 +4,7 @@ import configparser
 from datetime import datetime
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -55,6 +56,34 @@ def _unit(name: str) -> configparser.ConfigParser:
     return parser
 
 
+def _run_setup_dry(tmp_path: Path, blkid_body: str) -> subprocess.CompletedProcess[str]:
+    fakebin = tmp_path / "bin"
+    fakebin.mkdir()
+    (fakebin / "blkid").write_text(blkid_body, encoding="utf-8")
+    (fakebin / "blkid").chmod(0o755)
+    (fakebin / "getent").write_text(
+        '#!/usr/bin/env bash\n'
+        'if [[ "$1" == "passwd" && "$2" == "reviewer" ]]; then\n'
+        '  echo "reviewer:x:1000:1000:Reviewer:/home/reviewer:/bin/bash"\n'
+        '  exit 0\n'
+        'fi\n'
+        'exit 2\n',
+        encoding="utf-8",
+    )
+    (fakebin / "getent").chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = f"{fakebin}:{env['PATH']}"
+    env["CYBORG_KIOSK_USER"] = "reviewer"
+    return subprocess.run(
+        ["bash", str(ROOT / "scripts" / "setup.sh"), "--dry-run"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def test_run_cycles_refreshes_deterministically_and_serves_agenda(tmp_path):
     (tmp_path / "usb").mkdir()
     service = CyborgService(
@@ -101,6 +130,11 @@ def test_systemd_units_have_required_directives():
         unit = _unit(name)
         assert unit["Service"]["ExecStart"]
 
+    for name in ("cyborg-screen-off.service", "cyborg-screen-on.service"):
+        text = (SYSTEMD / name).read_text(encoding="utf-8")
+        assert "User=@CYBORG_KIOSK_USER@" in text
+        assert "Environment=XAUTHORITY=@CYBORG_KIOSK_HOME@/.Xauthority" in text
+
     for name in ("cyborg-screen-off.timer", "cyborg-screen-on.timer"):
         timer = _unit(name)
         assert timer["Timer"]["OnCalendar"]
@@ -139,10 +173,53 @@ def test_setup_script_contract_and_shellcheck_if_available():
     assert "raspi-config nonint do_i2c 0" in text
     assert "--no-index --find-links" in text
     assert "vcgencmd get_throttled" in text
+    assert "CYBORG_KIOSK_USER=\"${CYBORG_KIOSK_USER:-pi}\"" in text
+    assert "getty@tty1.service.d/override.conf" in text
+    assert "--autologin ${CYBORG_KIOSK_USER}" in text
+    assert 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then exec startx; fi' in text
+    assert "exec openbox-session" in text
+    assert '"${CYBORG_KIOSK_HOME}/.config/openbox/autostart"' in text
+    assert '"/home/${CYBORG_USER}/.config/openbox/autostart"' not in text
+    assert "blkid -t LABEL=CYBORG -o value -s UUID" in text
+    assert "Multiple ext4 filesystems detected" in text
     if shutil.which("shellcheck") is None:
         return
     result = subprocess.run(["shellcheck", str(script)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_setup_dry_run_generates_kiosk_boot_path_and_rendered_screen_units(tmp_path):
+    result = _run_setup_dry(
+        tmp_path,
+        '#!/usr/bin/env bash\n'
+        'if [[ "$*" == *"LABEL=CYBORG"* ]]; then echo "label-uuid"; exit 0; fi\n'
+        'if [[ "$*" == *"TYPE=ext4"* ]]; then echo "other-uuid"; exit 0; fi\n'
+        'exit 0\n',
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "UUID=label-uuid /mnt/cyborg ext4 nofail,noatime 0 2" in result.stdout
+    assert "ExecStart=-/sbin/agetty --autologin reviewer --noclear %I $TERM" in result.stdout
+    assert 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then exec startx; fi' in result.stdout
+    assert "exec openbox-session" in result.stdout
+    assert "/home/reviewer/.config/openbox/autostart" in result.stdout
+    assert "/home/cyborg/.config/openbox/autostart" not in result.stdout
+    assert "Environment=XAUTHORITY=/home/reviewer/.Xauthority" in result.stdout
+    assert "User=reviewer" in result.stdout
+    assert "Boot path configured: autologin tty1 (reviewer) -> startx -> openbox-session -> Openbox autostart -> Chromium kiosk." in result.stdout
+
+
+def test_setup_usb_selection_errors_on_ambiguous_ext4_without_cyborg_label(tmp_path):
+    result = _run_setup_dry(
+        tmp_path,
+        '#!/usr/bin/env bash\n'
+        'if [[ "$*" == *"LABEL=CYBORG"* ]]; then exit 0; fi\n'
+        'if [[ "$*" == *"TYPE=ext4"* ]]; then printf "uuid-one\\nuuid-two\\n"; exit 0; fi\n'
+        'exit 0\n',
+    )
+
+    assert result.returncode == 1
+    assert "Multiple ext4 filesystems detected and none is labeled CYBORG" in result.stderr
 
 
 def test_shutdown_button_imports_without_rpi_gpio(monkeypatch):

@@ -5,6 +5,7 @@ DRY_RUN=0
 USB_UUID="${CYBORG_USB_UUID:-}"
 CYBORG_USER="${CYBORG_USER:-cyborg}"
 CYBORG_GROUP="${CYBORG_GROUP:-cyborg}"
+CYBORG_KIOSK_USER="${CYBORG_KIOSK_USER:-pi}"
 INSTALL_DIR="${CYBORG_INSTALL_DIR:-/opt/cyborg-core}"
 CONFIG_DIR="${CYBORG_CONFIG_DIR:-/etc/cyborg}"
 MOUNT_POINT="${CYBORG_MOUNT_POINT:-/mnt/cyborg}"
@@ -12,6 +13,7 @@ CACHE_DIR="${MOUNT_POINT}/cyborg-cache"
 FALLBACK_DIR="${INSTALL_DIR}/fallback"
 BOOT_CONFIG="${CYBORG_BOOT_CONFIG:-/boot/firmware/config.txt}"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEPLOY_DIR="${INSTALL_DIR}/deploy"
 
 usage() {
   printf 'Usage: %s [--dry-run] [--usb-uuid UUID]\n' "$0"
@@ -37,6 +39,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  DEPLOY_DIR="${REPO_DIR}/deploy"
+fi
 
 run() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -72,6 +78,32 @@ ensure_line() {
   fi
 }
 
+user_home() {
+  local user="$1"
+  local home
+  home="$(getent passwd "$user" | cut -d: -f6 || true)"
+  if [[ -n "$home" ]]; then
+    printf '%s\n' "$home"
+  elif [[ "$DRY_RUN" -eq 1 ]]; then
+    printf '/home/%s\n' "$user"
+  else
+    printf 'Kiosk user %s does not exist. Create it or set CYBORG_KIOSK_USER to a login-capable user.\n' "$user" >&2
+    exit 1
+  fi
+}
+
+render_install_unit() {
+  local src="$1"
+  local dest="$2"
+  local content
+  content="$(sed \
+    -e "s|@CYBORG_KIOSK_USER@|${CYBORG_KIOSK_USER}|g" \
+    -e "s|@CYBORG_KIOSK_HOME@|${CYBORG_KIOSK_HOME}|g" \
+    "$src")"
+  write_file "$dest" "$content"
+  run sudo chmod 0644 "$dest"
+}
+
 chromium_package="chromium-browser"
 if command -v apt-cache >/dev/null 2>&1 && ! apt-cache show chromium-browser >/dev/null 2>&1; then
   chromium_package="chromium"
@@ -98,6 +130,7 @@ run sudo apt-get install -y "${apt_packages[@]}"
 if ! id "$CYBORG_USER" >/dev/null 2>&1; then
   run sudo useradd --system --create-home --home-dir "/home/${CYBORG_USER}" --shell /usr/sbin/nologin "$CYBORG_USER"
 fi
+CYBORG_KIOSK_HOME="$(user_home "$CYBORG_KIOSK_USER")"
 
 run sudo install -d -m 0755 -o "$CYBORG_USER" -g "$CYBORG_GROUP" "$INSTALL_DIR" "$FALLBACK_DIR"
 run sudo install -d -m 0755 "$CONFIG_DIR" "$MOUNT_POINT"
@@ -118,7 +151,19 @@ if [[ -f "$BOOT_CONFIG" ]] || [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 if [[ -z "$USB_UUID" ]] && command -v blkid >/dev/null 2>&1; then
-  USB_UUID="$(blkid -t TYPE=ext4 -o value -s UUID | head -n 1 || true)"
+  # Format the cache stick with: sudo mkfs.ext4 -L CYBORG /dev/sdX1
+  label_uuid="$(blkid -t LABEL=CYBORG -o value -s UUID | head -n 1 || true)"
+  if [[ -n "$label_uuid" ]]; then
+    USB_UUID="$label_uuid"
+  else
+    readarray -t ext4_uuids < <(blkid -t TYPE=ext4 -o value -s UUID || true)
+    if [[ "${#ext4_uuids[@]}" -gt 1 ]]; then
+      printf 'Multiple ext4 filesystems detected and none is labeled CYBORG. Re-run with --usb-uuid UUID.\n' >&2
+      exit 1
+    elif [[ "${#ext4_uuids[@]}" -eq 1 ]]; then
+      USB_UUID="${ext4_uuids[0]}"
+    fi
+  fi
 fi
 
 if [[ -n "$USB_UUID" ]]; then
@@ -152,14 +197,24 @@ elif [[ ! -f "${CONFIG_DIR}/config.local.toml" ]]; then
   sudo install -m 0640 -o "$CYBORG_USER" -g "$CYBORG_GROUP" "${INSTALL_DIR}/config.example.toml" "${CONFIG_DIR}/config.local.toml"
 fi
 
-run sudo install -m 0644 "${INSTALL_DIR}/deploy/systemd/cyborg-fetch.service" /etc/systemd/system/cyborg-fetch.service
-run sudo install -m 0644 "${INSTALL_DIR}/deploy/systemd/cyborg-screen-off.service" /etc/systemd/system/cyborg-screen-off.service
-run sudo install -m 0644 "${INSTALL_DIR}/deploy/systemd/cyborg-screen-off.timer" /etc/systemd/system/cyborg-screen-off.timer
-run sudo install -m 0644 "${INSTALL_DIR}/deploy/systemd/cyborg-screen-on.service" /etc/systemd/system/cyborg-screen-on.service
-run sudo install -m 0644 "${INSTALL_DIR}/deploy/systemd/cyborg-screen-on.timer" /etc/systemd/system/cyborg-screen-on.timer
-run sudo install -m 0644 "${INSTALL_DIR}/deploy/systemd/cyborg-shutdown-button.service" /etc/systemd/system/cyborg-shutdown-button.service
-run sudo install -d -m 0755 "/home/${CYBORG_USER}/.config/openbox"
-run sudo install -m 0755 -o "$CYBORG_USER" -g "$CYBORG_GROUP" "${INSTALL_DIR}/deploy/openbox/autostart" "/home/${CYBORG_USER}/.config/openbox/autostart"
+getty_override="[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${CYBORG_KIOSK_USER} --noclear %I \$TERM"
+write_file /etc/systemd/system/getty@tty1.service.d/override.conf "$getty_override"
+
+ensure_line "${CYBORG_KIOSK_HOME}/.bash_profile" 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then exec startx; fi'
+run sudo chown "$CYBORG_KIOSK_USER:$CYBORG_KIOSK_USER" "${CYBORG_KIOSK_HOME}/.bash_profile"
+write_file "${CYBORG_KIOSK_HOME}/.xinitrc" 'exec openbox-session'
+run sudo chown "$CYBORG_KIOSK_USER:$CYBORG_KIOSK_USER" "${CYBORG_KIOSK_HOME}/.xinitrc"
+
+run sudo install -m 0644 "${DEPLOY_DIR}/systemd/cyborg-fetch.service" /etc/systemd/system/cyborg-fetch.service
+render_install_unit "${DEPLOY_DIR}/systemd/cyborg-screen-off.service" /etc/systemd/system/cyborg-screen-off.service
+run sudo install -m 0644 "${DEPLOY_DIR}/systemd/cyborg-screen-off.timer" /etc/systemd/system/cyborg-screen-off.timer
+render_install_unit "${DEPLOY_DIR}/systemd/cyborg-screen-on.service" /etc/systemd/system/cyborg-screen-on.service
+run sudo install -m 0644 "${DEPLOY_DIR}/systemd/cyborg-screen-on.timer" /etc/systemd/system/cyborg-screen-on.timer
+run sudo install -m 0644 "${DEPLOY_DIR}/systemd/cyborg-shutdown-button.service" /etc/systemd/system/cyborg-shutdown-button.service
+run sudo install -d -m 0755 -o "$CYBORG_KIOSK_USER" -g "$CYBORG_KIOSK_USER" "${CYBORG_KIOSK_HOME}/.config/openbox"
+run sudo install -m 0755 -o "$CYBORG_KIOSK_USER" -g "$CYBORG_KIOSK_USER" "${DEPLOY_DIR}/openbox/autostart" "${CYBORG_KIOSK_HOME}/.config/openbox/autostart"
 
 touch_matrix='xinput set-prop "${CYBORG_TOUCH_DEVICE:-Acer UT222Q}" "Coordinate Transformation Matrix" 0 -1 1 1 0 0 0 0 1'
 write_file "/etc/X11/xorg.conf.d/99-cyborg-portrait.conf" 'Section "Monitor"
@@ -169,10 +224,13 @@ EndSection'
 printf 'Persisted touch transform command: %s\n' "$touch_matrix"
 
 run sudo systemctl daemon-reload
+run sudo systemctl enable getty@tty1.service
 run sudo systemctl enable cyborg-fetch.service
 run sudo systemctl enable cyborg-screen-off.timer
 run sudo systemctl enable cyborg-screen-on.timer
 run sudo systemctl enable cyborg-shutdown-button.service
+
+printf 'Boot path configured: autologin tty1 (%s) -> startx -> openbox-session -> Openbox autostart -> Chromium kiosk.\n' "$CYBORG_KIOSK_USER"
 
 if command -v vcgencmd >/dev/null 2>&1; then
   vcgencmd get_throttled
