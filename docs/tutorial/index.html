@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BOOYAH! Build Cyborg — the family-calendar wall display (v1 + v2)</title>
+<style>
+  /* Self-contained, OFFLINE. No web fonts, no CDN, no internet needed to read this guide. */
+  :root{
+    --bg:#08131f; --panel:#0e2235; --panel2:#13314a; --ink:#eaf3f8; --dim:#9fb2c0;
+    --cyan:#19b6ec; --cyan2:#5fd8ff; --accent:#2b6cff; --good:#36d399; --warn:#ffb84d;
+    --danger:#ff6b5e; --silver:#c7d3dc; --line:#1d3a54;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",-apple-system,"DejaVu Sans","Liberation Sans",Arial,sans-serif;
+    line-height:1.55;font-size:17px}
+  a{color:var(--cyan2)}
+  header.hero{padding:34px 22px 26px;background:linear-gradient(160deg,#0a1a2b,#123150);
+    border-bottom:4px solid var(--cyan)}
+  .wrap{max-width:980px;margin:0 auto;padding:0 20px}
+  .mark{display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;
+    font-weight:800;font-size:40px;color:#06121e;background:var(--cyan);border:4px solid var(--silver);
+    border-radius:14px;vertical-align:middle;margin-right:14px}
+  h1{font-size:34px;margin:14px 0 6px}
+  h2{font-size:27px;margin:30px 0 8px;border-left:6px solid var(--cyan);padding-left:12px}
+  h3{font-size:21px;margin:22px 0 6px;color:var(--cyan2)}
+  h4{font-size:18px;margin:16px 0 4px;color:var(--silver)}
+  code,kbd{background:#04101b;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font-family:"DejaVu Sans Mono","Consolas",monospace;font-size:14.5px;color:#cfe;word-break:break-word}
+  pre{background:#04101b;border:1px solid var(--line);border-left:4px solid var(--cyan);border-radius:8px;
+    padding:12px 14px;overflow:auto}
+  pre code{background:none;border:none;padding:0;color:#cfe}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0}
+  .grid{display:grid;gap:12px}
+  @media(min-width:720px){.cols2{grid-template-columns:1fr 1fr}}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:15px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--cyan2)}
+  .pill{display:inline-block;font-size:12.5px;padding:2px 9px;border-radius:999px;border:1px solid;margin-right:6px}
+  .pill.core{color:var(--good);border-color:var(--good)}
+  .pill.bonus{color:var(--warn);border-color:var(--warn)}
+  .pill.v2{color:var(--cyan2);border-color:var(--cyan2)}
+  .stars{color:var(--warn);letter-spacing:2px}
+  .role{font-weight:700;color:var(--cyan2)}
+  .mission{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:22px 0;overflow:hidden}
+  .mission>.mhead{background:linear-gradient(120deg,#103253,#0c2033);padding:14px 18px;border-bottom:2px solid var(--cyan)}
+  .mission>.mbody{padding:6px 18px 16px}
+  .meta{font-size:14px;color:var(--dim);margin-top:3px}
+  .know{border-left:4px solid var(--good);background:#0c241b;padding:9px 12px;border-radius:6px;margin:8px 0}
+  .know::before{content:"✅ You'll know it worked when… ";font-weight:700;color:var(--good)}
+  details.oops{border-left:4px solid var(--warn);background:#241c0c;border-radius:6px;margin:8px 0;padding:4px 12px}
+  details.oops>summary{cursor:pointer;font-weight:700;color:var(--warn);padding:6px 0}
+  .warnbox{border:2px solid var(--danger);background:#2a0f0d;border-radius:10px;padding:12px 14px;margin:12px 0}
+  .warnbox b{color:var(--danger)}
+  .safebox{border:2px solid var(--warn);background:#241c0c;border-radius:10px;padding:12px 14px;margin:12px 0}
+  .photo{border:2px dashed var(--cyan);border-radius:10px;padding:10px 14px;margin:12px 0;color:var(--cyan2);background:#08202e}
+  .photo::before{content:"📷 PHOTO SLOT — ";font-weight:700}
+  .step{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:none}
+  .step input[type=checkbox]{width:22px;height:22px;margin-top:3px;flex:0 0 auto;accent-color:var(--cyan)}
+  .badge{display:inline-block;border:2px solid var(--cyan);border-radius:10px;padding:6px 10px;margin:5px;font-size:14px}
+  .toc a{display:block;padding:3px 0;color:var(--silver);text-decoration:none}
+  .toc a:hover{color:var(--cyan2)}
+  .cert{border:5px double var(--cyan);border-radius:16px;padding:24px;text-align:center;background:#0a1f30;margin:18px 0}
+  .cert h2{border:none;justify-content:center;display:block}
+  .controls{position:sticky;top:0;z-index:5;background:#06121e;border-bottom:1px solid var(--line);
+    padding:8px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid var(--cyan);color:var(--cyan2)}
+  .svgwrap{background:#04101b;border:1px solid var(--line);border-radius:10px;padding:10px;margin:12px 0;overflow:auto}
+  .cy{color:var(--cyan2);font-weight:700}
+  @media print{
+    body{background:#fff;color:#000;font-size:12pt}
+    .controls,.toc-side{display:none!important}
+    .panel,.mission,.warnbox,.safebox,.know,details.oops,.svgwrap,pre{break-inside:avoid}
+    details.oops[open]>*{display:block}
+    details.oops>summary{color:#a60}
+    a{color:#000;text-decoration:underline}
+    .mark{color:#fff;background:#0a7;border-color:#333}
+    h2{border-left-color:#0a7}
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div><span class="mark">C</span><span style="font-size:15px;letter-spacing:5px;color:var(--cyan2)">CYBORG &nbsp;//&nbsp; HOME COMMAND CENTER</span></div>
+    <h1>BOOYAH! Let's build Cyborg 🤖</h1>
+    <p style="font-size:19px;color:var(--silver);max-width:760px">
+      A wall-mounted family calendar that runs your household — built by you and your kids over
+      a weekend. This guide is <b>infallible</b> (every step, every command, every "it worked!"
+      check) and <b>fun</b> (missions, roles, badges, and a real certificate). Cyborg is your
+      guide. When something works, we say it loud: <span class="cy">BOOYAH!</span>
+    </p>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="wrap" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%">
+    <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <button class="ghost" onclick="cyResetProgress()">↺ Reset my checkboxes</button>
+    <span id="progress" style="color:var(--dim);font-size:14px"></span>
+  </div>
+</div>
+
+<main class="wrap">
+
+<div class="panel toc">
+  <h3 style="margin-top:6px">🗺️ The Quest Map</h3>
+  <div class="grid cols2">
+    <div>
+      <b>Before you start</b>
+      <div class="toc">
+        <a href="#how">How to use this guide</a>
+        <a href="#roles">Your crew &amp; roles</a>
+        <a href="#bom">Parts list (BOM)</a>
+        <a href="#tools">Tools &amp; prerequisites</a>
+        <a href="#ics">Get your Apple calendar link</a>
+        <a href="#safety">The Golden Safety Rules</a>
+      </div>
+    </div>
+    <div>
+      <b>Weekend 1 — "Boot Cyborg Up" (v1)</b>
+      <div class="toc">
+        <a href="#m1">Mission 1 — Flash &amp; first boot</a>
+        <a href="#m2">Mission 2 — Keep Cyborg cool (fan)</a>
+        <a href="#m3">Mission 3 — Cyborg's heartbeat (RTC)</a>
+        <a href="#m4">Mission 4 — Install Cyborg's brain (code)</a>
+        <a href="#m5">Mission 5 — The memory stick (USB cache)</a>
+        <a href="#m6">Mission 6 — Stand tall (portrait + kiosk)</a>
+        <a href="#m7">Mission 7 — Give Cyborg a voice (BOOYAH)</a>
+        <a href="#m8">Mission 8 — Mount on the wall</a>
+        <a href="#m9">Mission 9 — Power button &amp; bedtime (bonus)</a>
+        <a href="#verify">Final checks &amp; the /health page</a>
+        <a href="#cert1">🏆 v1 Certificate</a>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:8px">
+    <b>Weekend 2 — "Cyborg Takes Command" (v2, the next level)</b>
+    <div class="toc">
+      <a href="#v2intro">What v2 adds</a> <a href="#v2arch">The zoned layout</a>
+      <a href="#v2weather">Weather + meal of the day</a> <a href="#v2chores">Chore chart (touch)</a>
+      <a href="#v2meals">Week's meals</a> <a href="#v2cert">🏆 v2 Certificate</a>
+    </div>
+  </div>
+  <div style="margin-top:8px">
+    <b>Reference</b>
+    <div class="toc">
+      <a href="#trouble">Troubleshooting HQ</a> <a href="#cmds">Command cheat-sheet</a>
+      <a href="#badges">Badge &amp; sticker checklist</a>
+    </div>
+  </div>
+</div>
+
+<section id="how">
+  <h2>How to use this guide</h2>
+  <div class="panel">
+    <p>Read every step <b>in order</b>. Do not skip ahead. Each step gives you the <b>exact</b>
+    command to type and what you should see; every mission — and every step that can trip you up —
+    has a green ✅ check and a 🛟 fix. You need <b>zero</b>
+    prior Linux or Raspberry&nbsp;Pi knowledge — we explain everything.</p>
+    <ul>
+      <li>📦 <b>Boxes you'll see:</b></li>
+    </ul>
+    <div class="know">the green box tells you exactly how to know a step succeeded.</div>
+    <details class="oops"><summary>🛟 If it didn't… (click me)</summary>
+      Yellow drop-downs hold the fix for the most common slip-ups. Tap the title to open it.</details>
+    <div class="warnbox"><b>⛔ RED = danger.</b> Stop and read. These protect Cyborg (and you).</div>
+    <div class="safebox">🟡 <b>YELLOW = caution.</b> A safety or "measure twice" note.</div>
+    <div class="photo">a great place to snap a real photo and tape it into your build journal.</div>
+    <p>✅ <b>The checkboxes save themselves</b> in this browser, so you can close the laptop and
+    come back. Use <b>🖨️ Print / Save as PDF</b> (top of page) to make a paper copy for the
+    workbench — it prints cleanly with all the troubleshooting expanded.</p>
+    <p><b>Difficulty</b> is shown in stars <span class="stars">★★☆</span> and each mission has a
+    rough <b>time</b>. <b>Tags:</b>
+    <span class="pill core">CORE</span> = do it,
+    <span class="pill bonus">BONUS</span> = optional level-up,
+    <span class="pill v2">V2</span> = Weekend 2.</p>
+  </div>
+</section>
+
+<section id="roles">
+  <h2>Your crew &amp; roles 🦸</h2>
+  <p>Cyborg works best with a team. Hand out these badges — each crew member owns their jobs at
+  every step (grown-ups: you're <span class="role">Mission Control</span>, and you do anything
+  with mains power, sharp tools, or screws into the wall).</p>
+  <div class="grid cols2">
+    <div class="panel"><span class="role">🔌 Captain of Cables</span><br>Owns every wire and plug:
+      the fan, the speaker, HDMI, power. Counts pins twice. Never lets a wire touch the wrong pin.</div>
+    <div class="panel"><span class="role">💻 Commander of Code</span><br>Owns the keyboard: types the
+      commands, reads the screen out loud, watches for the green "it worked" lines.</div>
+    <div class="panel"><span class="role">🔧 Master of the Mount</span><br>Owns the build: heatsinks,
+      the stand, the wall mount, tidy cables, and the SD/USB swaps.</div>
+    <div class="panel"><span class="role">🎖️ Mission Control (grown-up)</span><br>Owns safety: mains
+      power, the drill, checking pins before power-on, and the final "go".</div>
+  </div>
+  <p>Earn a <b>badge</b> at the end of each mission. Collect them all for the certificate. The full
+  list is in the <a href="#badges">Badge checklist</a>.</p>
+</section>
+
+<section id="bom">
+  <h2>Parts list — the BOM 📦</h2>
+  <p>Everything Cyborg needs. The "why" column tells you what each part is for, so nothing is a
+  mystery. <span class="pill core">CORE</span> parts are required;
+  <span class="pill bonus">BONUS</span> parts are optional level-ups.</p>
+  <table>
+    <tr><th>Part</th><th>What we use</th><th>Tag</th><th>Why it's here</th></tr>
+    <tr><td>Single-board computer</td><td><b>Raspberry Pi 3B</b> (1&nbsp;GB)</td><td><span class="pill core">CORE</span></td><td>Cyborg's brain. We keep everything light so this little board stays smooth.</td></tr>
+    <tr><td>Screen</td><td><b>Acer UT222Q 21.5″ touch</b>, mounted <b>portrait</b> (1080×1920)</td><td><span class="pill core">CORE</span></td><td>A tall calendar column you can read across the room. VESA 100×100 on the back.</td></tr>
+    <tr><td>Boot card</td><td><b>microSD 32&nbsp;GB, A1/A2</b> (e.g. SanDisk/Samsung)</td><td><span class="pill core">CORE</span></td><td>Holds the operating system. A1/A2 cards are fast and reliable.</td></tr>
+    <tr><td>Cache stick</td><td><b>USB memory stick ≥8&nbsp;GB</b></td><td><span class="pill core">CORE</span></td><td>Stores the "last-known-good" calendar so the always-on writing doesn't wear out the SD card. Smart engineering!</td></tr>
+    <tr><td>Cooling</td><td><b>Heatsink set + 5&nbsp;V 30&nbsp;mm fan</b> (≤0.1&nbsp;A, with finger guard)</td><td><span class="pill core">CORE</span></td><td>An always-on screen makes heat. The fan + heatsinks keep Cyborg cool so it never slows down.</td></tr>
+    <tr><td>Speaker</td><td><b>Small powered 3.5&nbsp;mm speaker</b></td><td><span class="pill core">CORE</span></td><td>So Cyborg can shout <span class="cy">BOOYAH!</span> when it wakes up and syncs.</td></tr>
+    <tr><td>Power</td><td><b>Official 5&nbsp;V / 2.5&nbsp;A Pi PSU</b> + the monitor's adapter, on a <b>switched power strip</b></td><td><span class="pill core">CORE</span></td><td>Clean, correct power. The strip is your safe on/off switch.</td></tr>
+    <tr><td>Mount</td><td><b>VESA 100×100 wall mount</b> (portrait) + standoffs/Velcro for the Pi</td><td><span class="pill core">CORE</span></td><td>Holds the screen on the wall and the Pi tidily behind it.</td></tr>
+    <tr><td>Real-time clock</td><td><b>DS3231 RTC module</b> + coin cell</td><td><span class="pill core">CORE</span> (Level-Up)</td><td>The Pi forgets the time when unplugged. The DS3231 remembers it, even offline.</td></tr>
+    <tr><td>Cable tidy</td><td><b>Adhesive clips + sleeve</b>; <b>right-angle micro-USB</b> &amp; <b>right-angle HDMI</b></td><td><span class="pill core">CORE</span></td><td>Keeps the wall run tidy and shallow so it sits flat and safe.</td></tr>
+    <tr><td>Power button</td><td><b>Momentary push button</b> + 2 jumper wires</td><td><span class="pill bonus">BONUS</span></td><td>A real "off" button for a clean shutdown — no yanking the plug.</td></tr>
+  </table>
+  <p class="meta">The loop added the cable-tidy + right-angle cables and the labeled standoff patch
+  because a flat, snag-free wall run is safer for kids and easier to service. Cheap, big payoff.</p>
+</section>
+
+<section id="tools">
+  <h2>Tools &amp; prerequisites 🧰</h2>
+  <div class="grid cols2">
+    <div class="panel"><h4>Tools you'll need</h4>
+      <ul>
+        <li>A second computer (Windows/Mac/Linux) with an <b>SD card reader</b>.</li>
+        <li>A <b>USB keyboard</b> (and mouse) for first boot.</li>
+        <li>A small <b>Phillips screwdriver</b>; for the wall mount: a <b>drill</b> + the right anchors (grown-up job).</li>
+        <li>A <b>tape measure</b> (for the wall-depth safety check).</li>
+        <li>Optional: a printed Raspberry Pi <b>pinout card</b> to double-check pins.</li>
+      </ul>
+    </div>
+    <div class="panel"><h4>Before you begin — checklist</h4>
+      <div class="step"><input type="checkbox" data-k="pre-wifi"><div>Home <b>Wi-Fi</b> name + password on hand. <b>Cyborg needs the internet</b> to fetch the calendar.</div></div>
+      <div class="step"><input type="checkbox" data-k="pre-ics"><div>Your <b>Apple/iCloud calendar share link(s)</b> ready — see the next section.</div></div>
+      <div class="step"><input type="checkbox" data-k="pre-power"><div>A free wall outlet / power strip near the mount spot.</div></div>
+      <div class="step"><input type="checkbox" data-k="pre-time"><div>A free weekend, snacks, and a sense of adventure. 🤖</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="ics">
+  <h2>Get your Apple calendar link 🔗</h2>
+  <div class="panel">
+    <p>Cyborg reads your calendar through a <b>public ICS link</b> — a read-only web address for a
+    calendar. <b>It can only read; it can never change your calendar.</b> No passwords or API keys
+    are stored anywhere. Here's how to get the link from iCloud (do this on your phone or Mac):</p>
+    <div class="step"><input type="checkbox" data-k="ics1"><div>On your iPhone, open <b>Calendar</b> → tap the calendar's <b>ⓘ</b> (Edit) → turn on <b>Public Calendar</b>.</div></div>
+    <div class="step"><input type="checkbox" data-k="ics2"><div>Tap <b>Share Link</b> → <b>Copy Link</b>. It looks like <code>webcal://p XX-caldav.icloud.com/published/2/…</code></div></div>
+    <div class="step"><input type="checkbox" data-k="ics3"><div>Change the start from <code>webcal://</code> to <code>https://</code>. That's your ICS URL. Save it somewhere you can paste it later.</div></div>
+    <div class="step"><input type="checkbox" data-k="ics4"><div>Want more than one calendar (e.g. "Family" and "School")? Repeat for each — you'll give each one its own colour later.</div></div>
+    <div class="know">pasting the <code>https://…</code> link into a browser downloads a <code>.ics</code> file full of <code>BEGIN:VEVENT</code> lines. That's the calendar data Cyborg will read.</div>
+    <details class="oops"><summary>🛟 If it didn't… there's no "Public Calendar" switch</summary>
+      You're probably on a calendar you don't own (a subscribed/holiday calendar). Public sharing
+      only works on calendars you created. Make a new calendar, move/add events to it, and share
+      that one. On a Mac you can also do this in the Calendar app: right-click the calendar →
+      <b>Share Calendar</b> → tick <b>Public Calendar</b>.</details>
+    <div class="safebox">🟡 <b>Keep the link private-ish.</b> Anyone with the link can <i>see</i> the
+      calendar. Don't post it publicly. You can rotate it any time by toggling Public Calendar off/on.</div>
+  </div>
+</section>
+
+<section id="safety">
+  <h2>The Golden Safety Rules 🛡️</h2>
+  <div class="warnbox">
+    <b>GOLDEN RULE #1 — POWER OFF FIRST.</b> Always <b>unplug the Pi</b> before you touch, add,
+    remove, or check ANY pin/wire on the 40-pin header. Plug power back in only after a grown-up has
+    checked every wire against the diagram. A loose wire brushed across a powered header is the
+    easiest way to kill the Pi.
+  </div>
+  <div class="warnbox">
+    <b>GOLDEN RULE #2 — NEVER bridge 5&nbsp;V to 3.3&nbsp;V or GND.</b> Count pins <b>twice</b> against
+    the diagram before every connection. Wire <b>one mission at a time</b>, check it, then move on.
+  </div>
+  <h3>Meet the 40-pin header (only the pins we use)</h3>
+  <p><b>Finding pin 1:</b> it's the <b>only pin with a square solder pad</b> (all others are round),
+  at one end of the header. Pins go in pairs down the header: 1&amp;2, 3&amp;4, 5&amp;6… Odd numbers
+  (1,3,5…) are one row; even (2,4,6…) the other. Always anchor on the <b>square pad = pin 1</b>.</p>
+  <div class="svgwrap"><pre>   ODD ROW (1,3,5…)            EVEN ROW (2,4,6…)
+        3V3  [ 1]■  [ 2]   5V
+ RTC▶ GPIO2  [ 3]   [ 4]   5V   ◀ FAN +
+ RTC▶ GPIO3  [ 5]   [ 6]   GND  ◀ FAN −
+       GPIO4 [ 7]   [ 8]   GPIO14
+  RTC▶  GND  [ 9]   [10]   GPIO15
+BTN▶ GPIO17  [11]   [12]   GPIO18
+      GPIO27 [13]   [14]   GND  ◀ BUTTON −
+        ...      (pins 15–40 mostly unused) ...
+■ = square pad = pin 1.  FAN=cooling fan · RTC=DS3231 clock · BTN=power button.
+Speaker is NOT a pin device — it plugs into the 3.5 mm audio jack.</pre></div>
+  <div class="photo">top-down shot of your real Pi header with pins 1, 4, 6, 11, 14 flagged with tape.</div>
+</section>
+
+<h2 style="margin-top:38px">🚀 Weekend 1 — "Boot Cyborg Up" (v1)</h2>
+<p>By the end of this weekend you'll have a working portrait wall calendar, themed as Cyborg,
+that survives Wi-Fi drops and shouts <span class="cy">BOOYAH!</span>. That's the whole, complete,
+celebrate-it build. (Weekend&nbsp;2 is an optional level-up.)</p>
+
+<div class="mission" id="m1">
+  <div class="mhead"><h3 style="margin:0">Mission 1 — Flash the card &amp; first boot</h3>
+    <div class="meta">Role lead: <span class="role">💻 Commander of Code</span> · Difficulty <span class="stars">★★☆</span> · ~45 min</div></div>
+  <div class="mbody">
+    <p>We put the operating system (the Pi's "Windows") onto the microSD card, then boot Cyborg for
+    the first time and get it on Wi-Fi.</p>
+    <div class="step"><input type="checkbox" data-k="m1-1"><div>On your <b>other computer</b>, download &amp; install the <b>Raspberry Pi Imager</b> from <code>raspberrypi.com/software</code>. Put the microSD into the card reader.</div></div>
+    <div class="step"><input type="checkbox" data-k="m1-2"><div>Open Imager → <b>Choose Device</b>: Raspberry Pi 3 → <b>Choose OS</b>: <b>Raspberry Pi OS (other)</b> → <b>Raspberry Pi OS Lite (32-bit)</b>. (Lite = no desktop, perfect for our light little Pi.)</div></div>
+    <div class="step"><input type="checkbox" data-k="m1-3"><div><b>Choose Storage</b>: your microSD. Then click the <b>⚙️ gear</b> (Edit Settings):
+      set hostname <code>cyborg</code>; enable <b>SSH</b> (password); set username <code>pi</code> + a password you'll remember; enter your <b>Wi-Fi name + password</b> + your country; set your locale/timezone.</div></div>
+    <div class="step"><input type="checkbox" data-k="m1-4"><div>Click <b>Write</b>. Wait for "Write Successful". Eject the card and put it into the Pi's slot (contacts facing the board).</div></div>
+    <div class="step"><input type="checkbox" data-k="m1-5"><div>Plug in keyboard + the monitor (HDMI) for now. Plug in Pi <b>power last</b>. The green light blinks — Cyborg is booting!</div></div>
+    <div class="step"><input type="checkbox" data-k="m1-6"><div>Log in as <code>pi</code> with your password. Then update everything:
+      <pre><code>sudo apt update &amp;&amp; sudo apt full-upgrade -y
+sudo apt install -y git python3-venv python3-pip
+ping -c 3 raspberrypi.com</code></pre></div></div>
+    <div class="know">you see a login prompt that says <code>cyborg login:</code>, you log in, and the <code>ping</code> shows replies (Cyborg is on the internet). <span class="cy">BOOYAH — Cyborg is alive!</span></div>
+    <details class="oops"><summary>🛟 If it didn't… no Wi-Fi / ping fails</summary>
+      Re-check the Wi-Fi name + password (case-sensitive) you typed in the Imager gear. Run
+      <code>sudo raspi-config</code> → <b>System Options → Wireless LAN</b> to re-enter them, then
+      <code>sudo reboot</code>. Make sure you're on a <b>2.4&nbsp;GHz</b> network — the Pi 3B's Wi-Fi
+      doesn't see some 5&nbsp;GHz-only networks.</details>
+    <details class="oops"><summary>🛟 If it didn't… black screen / no boot</summary>
+      Re-seat the microSD. Re-flash the card (a bad write is common). Use the <b>official</b> Pi power
+      supply — under-powered chargers cause boot loops. If you see a rainbow square, the card didn't
+      flash correctly.</details>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">⚡ Spark of Life</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m2">
+  <div class="mhead"><h3 style="margin:0">Mission 2 — Keep Cyborg cool (heatsinks + fan)</h3>
+    <div class="meta">Role lead: <span class="role">🔧 Master of the Mount</span> &amp; <span class="role">🔌 Captain of Cables</span> · <span class="stars">★★☆</span> · ~20 min · <span class="pill core">CORE</span></div></div>
+  <div class="mbody">
+    <div class="warnbox"><b>POWER OFF FIRST.</b> Unplug the Pi before touching any pin.</div>
+    <div class="step"><input type="checkbox" data-k="m2-1"><div>Peel and stick the <b>heatsinks</b> onto the two main chips (the big square one is the processor).</div></div>
+    <div class="step"><input type="checkbox" data-k="m2-2"><div>Wire the fan: <b>RED (+) → Pin 4</b> (5&nbsp;V), <b>BLACK (−) → Pin 6</b> (GND). Count pins twice. The fan should blow <b>onto</b> the board; the finger-guard faces out.</div></div>
+    <div class="svgwrap"><pre>Fan RED  (+) ───► Pin 4  (5V rail)
+Fan BLACK(−) ───► Pin 6  (GND)
+Always-on power rail — NOT a switch. Fan ≤ 0.1 A, guard fitted.</pre></div>
+    <div class="step"><input type="checkbox" data-k="m2-3"><div>Grown-up double-checks the two pins against the diagram, then power on. Check the temperature:
+      <pre><code>vcgencmd measure_temp</code></pre></div></div>
+    <div class="know">on power-up you feel air moving, and <code>measure_temp</code> reads well under <b>70°C</b> (e.g. <code>temp=48.3'C</code>). Cool as a cyborg. 😎</div>
+    <details class="oops"><summary>🛟 If it didn't… fan doesn't spin</summary>
+      Power off. The connector is on the wrong pins or backwards. The fan's <b>+</b> must be on
+      <b>Pin 4</b> and <b>−</b> on <b>Pin 6</b> — these are right next to each other near pin 1.
+      Some fans only spin reliably from the 5&nbsp;V rail (pins 2/4); we use pin 4. Re-seat firmly.</details>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">❄️ Cool Customer</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m3">
+  <div class="mhead"><h3 style="margin:0">Mission 3 — Cyborg's heartbeat (DS3231 real-time clock)</h3>
+    <div class="meta">Role lead: <span class="role">🔌 Captain of Cables</span> · <span class="stars">★★★</span> · ~30 min · <span class="pill core">CORE</span> (Level-Up)</div></div>
+  <div class="mbody">
+    <p>The Pi forgets the time when it's unplugged. The DS3231 is a tiny clock with its own battery
+    so Cyborg shows the right time the instant it powers on — even before Wi-Fi connects.</p>
+    <div class="warnbox"><b>POWER OFF FIRST.</b> And note: <b>RTC VCC goes to Pin&nbsp;1 (3.3&nbsp;V) — NEVER Pin&nbsp;2 or 4 (those are 5&nbsp;V and will damage it).</b></div>
+    <div class="step"><input type="checkbox" data-k="m3-1"><div>Wire the DS3231 (four wires):</div></div>
+    <div class="svgwrap"><pre>RTC VCC ─► Pin 1  (3V3)     ⟵ NOT 5V!
+RTC GND ─► Pin 9  (GND)
+RTC SDA ─► Pin 3  (GPIO2 / I²C data)
+RTC SCL ─► Pin 5  (GPIO3 / I²C clock)</pre></div>
+    <div class="step"><input type="checkbox" data-k="m3-2"><div>Grown-up checks the 4 wires. Power on, log in, then install the I²C tools and turn I²C on:
+      <pre><code>sudo apt install -y i2c-tools
+sudo raspi-config nonint do_i2c 0
+sudo reboot</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m3-3"><div>After it reboots, log in and look for the clock:
+      <pre><code>sudo i2cdetect -y 1</code></pre>
+      You should see <code>68</code> in the grid (its address).</div></div>
+    <div class="step"><input type="checkbox" data-k="m3-4"><div>Tell Linux to use it, then save the current (Wi-Fi-synced) time onto the chip:
+      <pre><code>sudo apt install -y python3-smbus
+echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+# after reboot:
+sudo hwclock -r        # read the RTC
+sudo hwclock -w        # write current time to the RTC</code></pre></div></div>
+    <div class="know"><code>sudo i2cdetect -y 1</code> shows <b>68</b>, and <code>sudo hwclock -r</code> prints the correct date and time. Cyborg's heart is ticking. ❤️</div>
+    <details class="oops"><summary>🛟 If it didn't… nothing at 0x68</summary>
+      Power off and recheck: SDA on <b>Pin 3</b>, SCL on <b>Pin 5</b>, VCC on <b>Pin 1</b> (not 5&nbsp;V!),
+      GND on <b>Pin 9</b>. A swapped SDA/SCL or VCC on a 5&nbsp;V pin are the usual culprits. Make sure
+      you ran <code>do_i2c 0</code> and rebooted.</details>
+    <p class="meta">ℹ️ Because the clock uses GPIO3, the "short GPIO3 to wake a halted Pi" trick isn't
+    available — that's fine, our power button (Mission 9) uses GPIO17 instead.</p>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">❤️ Heartbeat</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m4">
+  <div class="mhead"><h3 style="margin:0">Mission 4 — Install Cyborg's brain (the code)</h3>
+    <div class="meta">Role lead: <span class="role">💻 Commander of Code</span> · <span class="stars">★★☆</span> · ~35 min · <span class="pill core">CORE</span></div></div>
+  <div class="mbody">
+    <p>Now we put Cyborg's software on the Pi and give it your calendar link(s). First we'll run it
+    by hand to prove it works, then later missions make it start automatically.</p>
+    <div class="step"><input type="checkbox" data-k="m4-1"><div>Get the project folder onto the Pi. Pick the line that matches how you have it, then run the <code>ls</code> check:
+      <pre><code># Option A — it's on a USB stick (the part after /media/pi/ is the stick's name):
+cp -r /media/pi/*/onward-cyborg ~/onward-cyborg
+
+# Option B — copy from another computer on the same Wi-Fi (run this ON that computer):
+#   scp -r ~/forge/onward-cyborg  pi@cyborg.local:~/onward-cyborg
+
+# Option C — you host it in git:
+#   git clone &lt;your repo url&gt; ~/onward-cyborg
+
+cd ~/onward-cyborg
+ls cyborg_core      # you should see config.py  server.py  service.py …</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m4-2"><div>Make Cyborg's settings file from the example, then open it to edit:
+      <pre><code>cp config.example.toml config.local.toml
+nano config.local.toml</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m4-3"><div>In the editor, set <code>home_tz</code> to your timezone, and for each calendar paste your
+      <code>https://…</code> ICS link into <code>url</code> and pick a <code>color</code>. Example:
+      <pre><code>[service]
+home_tz = "America/Chicago"
+port = 8765
+
+[[calendars]]
+id = "family"
+name = "Family"
+url = "https://p XX-caldav.icloud.com/published/2/YOUR-FAMILY-LINK"
+color = "#4C78A8"
+
+[[calendars]]
+id = "school"
+name = "School"
+url = "https://p XX-caldav.icloud.com/published/2/YOUR-SCHOOL-LINK"
+color = "#F58518"</code></pre>
+      Save in nano with <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Enter</kbd>, then <kbd>Ctrl</kbd>+<kbd>X</kbd>.</div></div>
+    <div class="step"><input type="checkbox" data-k="m4-4"><div>Make a little Python sandbox and install Cyborg's two helper libraries:
+      <pre><code>python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m4-5"><div>Run Cyborg by hand:
+      <pre><code>.venv/bin/python -m cyborg_core --config config.local.toml</code></pre>
+      Leave it running. On the Pi (or another computer on the same Wi-Fi) open a browser to
+      <code>http://cyborg.local:8765/</code> (or <code>http://&lt;the Pi's IP&gt;:8765/</code>).</div></div>
+    <div class="know"><code>http://cyborg.local:8765/health</code> opens and shows a page of status
+      fields (raw JSON) including <code>"fetch": {"ok": true …}</code> — that means Cyborg reached your
+      calendar. The calendar page itself may say <b>"waking up / syncing"</b> for now — <b>that's expected</b>:
+      Cyborg needs the memory stick from Mission&nbsp;5 before it can save and show events. Press
+      <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it for now. <span class="cy">BOOYAH — the brain works!</span></div>
+    <details class="oops"><summary>🛟 If it didn't… <code>/health</code> shows <code>"fetch": {"ok": false}</code></summary>
+      Cyborg couldn't read your calendar. Check your <code>url</code> lines really start with
+      <code>https://</code> (not <code>webcal://</code>), and paste one link straight into a browser to
+      confirm it downloads a <code>.ics</code> file. The <code>fetch.last_error</code> field on
+      <code>/health</code> (and any red line in the terminal) tells you exactly what went wrong.
+      (A "waking up / syncing" calendar screen at this stage is normal — that's fixed in Mission&nbsp;5.)</details>
+    <details class="oops"><summary>🛟 If it didn't… "cyborg.local" won't load</summary>
+      Find the Pi's IP with <code>hostname -I</code> and use <code>http://THAT-IP:8765/</code> instead.
+      Make sure the other computer is on the <b>same Wi-Fi</b>.</details>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">🧠 Brain Online</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m5">
+  <div class="mhead"><h3 style="margin:0">Mission 5 — The memory stick (USB last-known-good cache)</h3>
+    <div class="meta">Role lead: <span class="role">💻 Commander of Code</span> · <span class="stars">★★☆</span> · ~20 min · <span class="pill core">CORE</span></div></div>
+  <div class="mbody">
+    <p>Cyborg saves a copy of the calendar so the screen never goes blank when Wi-Fi drops. We keep
+    that copy on a <b>USB stick</b> instead of the SD card, because writing to the SD card all day,
+    every day would wear it out. (Real engineers protect their storage!)</p>
+    <div class="warnbox"><b>This ERASES the USB stick.</b> Use an empty one. Double-check you picked the right drive letter below.</div>
+    <div class="step"><input type="checkbox" data-k="m5-1"><div>Plug the USB stick into the Pi. Find its name:
+      <pre><code>lsblk</code></pre>
+      It's usually <code>sda</code> with a partition <code>sda1</code> (NOT <code>mmcblk0</code> — that's the SD card!).</div></div>
+    <div class="step"><input type="checkbox" data-k="m5-2"><div>Format it as Linux <b>ext4</b> and give it the label <b>CYBORG</b> (the setup script looks for this label):
+      <pre><code>sudo umount /dev/sda1 2&gt;/dev/null || true
+sudo mkfs.ext4 -L CYBORG /dev/sda1</code></pre>
+      Type <code>y</code> if it asks to proceed.
+      <details class="oops"><summary>🛟 If it didn't… "device is busy" or you can't find sda1</summary>
+        Run <code>lsblk</code> again. The USB is the one whose size matches your stick — usually
+        <code>sda1</code>, <b>never</b> <code>mmcblk0</code> (that's the SD card with the OS!). "Busy"
+        means it's mounted: run the <code>sudo umount</code> line first. If your stick shows as
+        <code>sdb1</code> instead, use that name everywhere in this mission.</details></div></div>
+    <div class="step"><input type="checkbox" data-k="m5-3"><div>Mount it now to test, make the cache folder, and check the UUID:
+      <pre><code>sudo mkdir -p /mnt/cyborg
+sudo mount /dev/sda1 /mnt/cyborg
+sudo mkdir -p /mnt/cyborg/cyborg-cache
+sudo chown -R pi:pi /mnt/cyborg/cyborg-cache
+blkid /dev/sda1     # shows UUID=... LABEL="CYBORG"</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m5-4"><div>Run Cyborg by hand again, watch the cache file appear, then check the calendar <b>while it's still running</b>:
+      <pre><code>cd ~/onward-cyborg
+.venv/bin/python -m cyborg_core --config config.local.toml &amp;
+sleep 8
+ls -l /mnt/cyborg/cyborg-cache/    # you should see last-known-good.json</code></pre>
+      <b>Leave it running</b> and open <code>http://cyborg.local:8765/</code> in a browser — your events
+      should now show. <b>Once you've seen them</b>, stop the test server:
+      <pre><code>kill %1</code></pre></div></div>
+    <div class="know"><code>blkid</code> shows <code>LABEL="CYBORG"</code>; after running, a file
+      <code>last-known-good.json</code> appears in <code>/mnt/cyborg/cyborg-cache/</code>; and now the
+      calendar page at <code>http://cyborg.local:8765/</code> finally shows <b>your events</b> — Cyborg
+      has a place to save them. That's the backup memory. 🧠💾</div>
+    <details class="oops"><summary>🛟 If it didn't… no <code>last-known-good.json</code></summary>
+      Cyborg only writes the cache when it has fetched real events, and only writes when something
+      changed. Make sure your calendar links work (Mission 4) and give it ~10 seconds. Check
+      <code>http://cyborg.local:8765/health</code> → the <code>usb</code> section should say
+      <code>writable: true</code>. If it says <code>using_fallback: true</code>, the stick isn't mounted
+      at <code>/mnt/cyborg</code> — re-do the mount step.</details>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">💾 Backup Memory</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m6">
+  <div class="mhead"><h3 style="margin:0">Mission 6 — Stand tall &amp; start on boot (portrait + kiosk)</h3>
+    <div class="meta">Role lead: <span class="role">💻 Commander of Code</span> · <span class="stars">★★★</span> · ~30 min · <span class="pill core">CORE</span></div></div>
+  <div class="mbody">
+    <p>One magic script wires everything to start automatically: it installs the kiosk, rotates the
+    screen to <b>portrait</b>, sets up the night-time screen schedule, mounts your USB by its label,
+    and makes Cyborg boot straight into the calendar. Let's peek first, then run it.</p>
+    <div class="step"><input type="checkbox" data-k="m6-1"><div>See exactly what it <i>would</i> do (changes nothing):
+      <pre><code>cd ~/onward-cyborg
+sudo ./scripts/setup.sh --dry-run | less</code></pre>
+      Press <kbd>q</kbd> to quit the preview.</div></div>
+    <div class="step"><input type="checkbox" data-k="m6-2"><div>Run it for real (this installs packages and may take a few minutes):
+      <pre><code>sudo ./scripts/setup.sh</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m6-3"><div>Give the installed service <b>your</b> calendar settings (the script created a placeholder):
+      <pre><code>sudo cp ~/onward-cyborg/config.local.toml /etc/cyborg/config.local.toml
+sudo systemctl restart cyborg-fetch.service
+systemctl status cyborg-fetch.service --no-pager</code></pre>
+      Look for <code>active (running)</code>.</div></div>
+    <div class="step"><input type="checkbox" data-k="m6-4"><div>Reboot into the finished kiosk:
+      <pre><code>sudo reboot</code></pre></div></div>
+    <div class="know">after reboot, the Pi automatically shows the <b>full-screen portrait Cyborg
+      calendar</b> — no login, no desktop, no mouse needed. The clock ticks and your events are listed.
+      <span class="cy">BOOYAH — that's the appliance!</span></div>
+    <details class="oops"><summary>🛟 If it didn't… screen is sideways</summary>
+      Our config rotates "left". If your monitor is mounted the other way, edit
+      <code>/etc/X11/xorg.conf.d/99-cyborg-portrait.conf</code> and change <code>"left"</code> to
+      <code>"right"</code>, then <code>sudo reboot</code>.</details>
+    <details class="oops"><summary>🛟 If it didn't… boots to a text login, no calendar</summary>
+      The graphical kiosk runs as the <code>pi</code> user via auto-login on screen 1. Run
+      <code>sudo systemctl status getty@tty1</code> (should show the autologin) and
+      <code>cat ~/.xinitrc</code> (should say <code>exec openbox-session</code>). Re-run
+      <code>sudo ./scripts/setup.sh</code> — it's safe to run again. Confirm the fetch service is up:
+      <code>systemctl status cyborg-fetch</code>.</details>
+    <details class="oops"><summary>🛟 If it didn't… screen is blank/black after boot</summary>
+      Open <code>http://cyborg.local:8765/health</code> from your phone. If that loads, the brain is
+      fine and it's a display issue (check the HDMI cable + that the monitor input is the right HDMI
+      port). If it doesn't load, see <a href="#trouble">Troubleshooting HQ</a>.</details>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">🧍 Stand Tall</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m7">
+  <div class="mhead"><h3 style="margin:0">Mission 7 — Give Cyborg a voice (BOOYAH!)</h3>
+    <div class="meta">Role lead: <span class="role">🔌 Captain of Cables</span> · <span class="stars">★★☆</span> · ~20 min · <span class="pill core">CORE</span></div></div>
+  <div class="mbody">
+    <p>Time for the best part. Cyborg shouts <span class="cy">BOOYAH!</span> on three <b>system</b>
+    moments only: when it wakes up, when it successfully refreshes, and when it recovers after being
+    offline. It <b>never</b> reacts to what's <i>in</i> your calendar — that's a promise baked into the
+    code (and tested!). It's also rate-limited so it's a treat, not a nuisance.</p>
+    <div class="step"><input type="checkbox" data-k="m7-1"><div>Plug the powered speaker into the Pi's <b>3.5&nbsp;mm</b> jack and turn it on. Force audio out of that jack:
+      <pre><code>sudo raspi-config nonint do_audio 1   # 1 = 3.5mm headphone jack
+amixer set Master 90%</code></pre>
+      <span class="meta">On newer Raspberry Pi OS you can instead choose the output in
+      <code>sudo raspi-config</code> → <b>System Options → Audio</b>, then test with
+      <code>speaker-test -t wav -c 2</code> (<kbd>Ctrl</kbd>+<kbd>C</kbd> to stop).</span></div></div>
+    <div class="step"><input type="checkbox" data-k="m7-2"><div>Give Cyborg a sound. The repo ships <b>no</b> audio, so we make our own chime right on the Pi (you
+      can swap in a real "Booyah!" recording later). It must live in this <b>local</b> folder — it's
+      never committed to the project:
+      <pre><code>sudo apt install -y sox libsox-fmt-mp3
+sudo mkdir -p /opt/cyborg-core/web/assets
+# make a cheerful two-note chime as booyah.mp3:
+sudo sox -n /opt/cyborg-core/web/assets/booyah.mp3 synth 0.18 sine 660 synth 0.28 sine 990 vol 0.6
+sudo chown -R pi:pi /opt/cyborg-core/web/assets</code></pre>
+      <span class="meta">Prefer your own voice? Record one and save it to the same path:
+      <code>arecord -d 2 -f cd booyah.wav</code> then <code>sox booyah.wav /opt/cyborg-core/web/assets/booyah.mp3</code>.
+      Want a face for Cyborg too? Drop an image at <code>/opt/cyborg-core/web/assets/cyborg-mark.png</code>
+      — it replaces the placeholder "C".</span></div></div>
+    <div class="step"><input type="checkbox" data-k="m7-3"><div>Make the BOOYAH fire on the next wake-up:
+      <pre><code>sudo systemctl restart cyborg-fetch.service
+# then reload the kiosk page (or sudo reboot)</code></pre></div></div>
+    <div class="know">when the kiosk loads, you hear your <b>BOOYAH!</b> once. Refresh the page a few times —
+      it stays quiet (the rate-limit), proving it only fires on real system events. 🔊</div>
+    <details class="oops"><summary>🛟 If it didn't… no sound</summary>
+      Three checks: (1) the file is exactly <code>/opt/cyborg-core/web/assets/booyah.mp3</code> — open
+      <code>http://cyborg.local:8765/assets/booyah.mp3</code> in a browser; it should play. (2) The
+      speaker is powered on and the jack is fully seated. (3) Run <code>speaker-test -t wav -c 2</code>
+      to confirm audio output, and re-run the <code>do_audio 1</code> step. The kiosk is configured to
+      allow auto-play sound, so once the file and speaker are right, it just works.</details>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">🔊 The Voice</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m8">
+  <div class="mhead"><h3 style="margin:0">Mission 8 — Mount Cyborg on the wall</h3>
+    <div class="meta">Role lead: <span class="role">🔧 Master of the Mount</span> + <span class="role">🎖️ Mission Control</span> · <span class="stars">★★★</span> · ~45 min · <span class="pill core">CORE</span></div></div>
+  <div class="mbody">
+    <div class="warnbox"><b>⛔ FRIDGE-WALL CAUTION (read first).</b> The cabinet wall has the <b>fridge on
+      the other side</b>. Before driving <b>any</b> screw, <b>measure the wall depth and your screw
+      length</b> so nothing pokes through toward the fridge. If in doubt, use shorter screws or a
+      surface-mount bracket. Grown-up does all drilling.</div>
+    <div class="step"><input type="checkbox" data-k="m8-1"><div>Hold the VESA bracket in <b>portrait</b> orientation against the spot. Check it's level and that the screen will sit at a good viewing height.</div></div>
+    <div class="step"><input type="checkbox" data-k="m8-2"><div>Mark the holes. <b>Measure wall depth vs screw length</b> (fridge caution!). Use anchors rated for the screen's weight. Drill + fix the bracket (grown-up).</div></div>
+    <div class="step"><input type="checkbox" data-k="m8-3"><div>Attach the screen to the bracket (VESA 100×100). Stick/standoff the Pi to the back of the monitor or the cabinet wall, leaving an <b>air gap</b> so the fan can breathe.</div></div>
+    <div class="step"><input type="checkbox" data-k="m8-4"><div>Use the <b>right-angle</b> HDMI + power cables to keep it shallow. Leave a small <b>service loop</b> of cable and clip the run tidily. Keep the <b>SD card + USB reachable</b> for future swaps.</div></div>
+    <div class="step"><input type="checkbox" data-k="m8-5"><div>Plug everything into the <b>switched power strip</b>. Flip it on.</div></div>
+    <div class="know">Cyborg is on the wall, powered through one switch, cables tidy, fan breathing,
+      and you can still reach the SD/USB. The calendar glows in portrait. 🧲</div>
+    <details class="oops"><summary>🛟 If it didn't… it won't sit flat / cables too deep</summary>
+      Swap straight HDMI/power cables for the <b>right-angle</b> ones from the BOM. Add a slim cable
+      sleeve. Make sure the Pi isn't pressing on any cable bend.</details>
+    <div class="photo">the finished rear: Pi on standoffs, fan air-gap, tidy cable run, and the SD/USB access point.</div>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">🧲 Master of the Mount</span></p>
+  </div>
+</div>
+
+<div class="mission" id="m9">
+  <div class="mhead"><h3 style="margin:0">Mission 9 — Power button &amp; bedtime schedule</h3>
+    <div class="meta">Role lead: <span class="role">🔌 Captain of Cables</span> · <span class="stars">★★☆</span> · ~25 min · <span class="pill bonus">BONUS</span></div></div>
+  <div class="mbody">
+    <p>Two nice-to-haves: a real <b>off button</b> (so you never yank the plug), and an automatic
+    <b>screen bedtime</b> so the display rests overnight (the setup script already installed the
+    schedule — 10:00&nbsp;pm off, 6:30&nbsp;am on).</p>
+    <h4>Power button (GPIO17)</h4>
+    <div class="warnbox"><b>POWER OFF FIRST.</b></div>
+    <div class="step"><input type="checkbox" data-k="m9-1"><div>Wire a momentary button across <b>Pin 11 (GPIO17)</b> and <b>Pin 14 (GND)</b>. On a 4-leg button, use two <b>diagonal</b> legs. No resistor needed.</div></div>
+    <div class="svgwrap"><pre>Button leg A ─► Pin 11 (GPIO17)
+Button leg B ─► Pin 14 (GND)
+Press = clean shutdown (a tiny service watches GPIO17).</pre></div>
+    <div class="step"><input type="checkbox" data-k="m9-2"><div>The shutdown watcher was installed by setup.sh. Make sure it's running:
+      <pre><code>systemctl status cyborg-shutdown-button.service --no-pager</code></pre></div></div>
+    <div class="step"><input type="checkbox" data-k="m9-3"><div>Hold the button ~2 seconds. The Pi powers down cleanly (green light blinks the shutdown pattern, then off).</div></div>
+    <div class="know">a long press cleanly shuts Cyborg down — no plug-yanking — and the screen turns
+      itself off at night and back on in the morning. 😴</div>
+    <details class="oops"><summary>🛟 If it didn't… button does nothing</summary>
+      4-leg buttons connect the wrong legs easily — use <b>diagonal</b> legs (or test with a multimeter).
+      Confirm the wires are on <b>Pin 11</b> and <b>Pin 14</b>, and that
+      <code>cyborg-shutdown-button.service</code> shows <code>active (running)</code>.</details>
+    <h4>Adjust the bedtime hours (optional)</h4>
+    <p>Edit the <code>OnCalendar=</code> times in
+    <code>/etc/systemd/system/cyborg-screen-off.timer</code> and
+    <code>…-on.timer</code>, then <code>sudo systemctl daemon-reload</code>.</p>
+    <p>🎖️ <b>Badge earned:</b> <span class="badge">🔘 The Big Red Button</span></p>
+  </div>
+</div>
+
+<section id="verify">
+  <h2>Final checks &amp; Cyborg's health page 🩺</h2>
+  <p>Cyborg has a built-in status page so you never have to guess. From any phone/laptop on your
+  Wi-Fi, open <code>http://cyborg.local:8765/health</code>. Here's what to look for:</p>
+  <table>
+    <tr><th>Field</th><th>Good value</th><th>What it means</th></tr>
+    <tr><td><code>fetch.ok</code></td><td><code>true</code></td><td>Cyborg reached your calendar.</td></tr>
+    <tr><td><code>usb.writable</code></td><td><code>true</code></td><td>The backup memory stick is mounted &amp; writable.</td></tr>
+    <tr><td><code>usb.using_fallback</code></td><td><code>false</code></td><td>It's using the USB stick (not the SD fallback).</td></tr>
+    <tr><td><code>lkg.staleness.tier</code></td><td><code>fresh</code></td><td>Data is under 15 min old.</td></tr>
+    <tr><td><code>clock.home_tz</code></td><td>your timezone</td><td>Times shown in your zone.</td></tr>
+    <tr><td><code>undervoltage</code></td><td><code>0x0</code></td><td>Power is healthy (no lightning-bolt).</td></tr>
+  </table>
+  <h3>The v1 acceptance checklist</h3>
+  <div class="panel">
+    <div class="step"><input type="checkbox" data-k="v-1"><div>Calendar shows events from your <b>≥1</b> shared calendars with the right colours.</div></div>
+    <div class="step"><input type="checkbox" data-k="v-2"><div>Unplug the router for a minute — the calendar <b>stays on screen</b> and a friendly "running on backup memory" chip appears. Never blank.</div></div>
+    <div class="step"><input type="checkbox" data-k="v-3"><div>Pull Pi power, plug back in — it <b>auto-returns</b> to the portrait calendar with no keyboard.</div></div>
+    <div class="step"><input type="checkbox" data-k="v-4"><div>The "now / next" block highlights the upcoming event; the clock is correct.</div></div>
+    <div class="step"><input type="checkbox" data-k="v-5"><div><code>/health</code> looks like the table above. <code>undervoltage</code> is <code>0x0</code>.</div></div>
+    <div class="step"><input type="checkbox" data-k="v-6"><div>You heard <b>BOOYAH</b> on boot (once), and it didn't nag on every refresh.</div></div>
+  </div>
+  <div class="know">all six boxes are ticked. <b>Cyborg v1 is DONE.</b> 🎉</div>
+</section>
+
+<section id="cert1">
+  <div class="cert">
+    <div style="font-size:13px;letter-spacing:6px;color:var(--cyan2)">OFFICIAL HOME COMMAND CENTER CERTIFICATE</div>
+    <h2 style="font-size:30px">🏆 BOOYAH! You built Cyborg (v1) 🏆</h2>
+    <p>This certifies that the crew —</p>
+    <p style="font-size:20px">__________________________ &nbsp; &amp; &nbsp; __________________________</p>
+    <p>— did flash, wire, cool, code, mount, and awaken a real wall-mounted family command center,
+    honoring every Golden Safety Rule, and made it shout <span class="cy">BOOYAH!</span></p>
+    <p class="meta">Captain of Cables ✦ Commander of Code ✦ Master of the Mount ✦ Mission Control</p>
+    <p>Date: ______________  ·  Cyborg says: <b>"BOOYAH! Outstanding work, team."</b></p>
+  </div>
+  <p style="text-align:center">Want more? Cyborg can run your <i>whole</i> household. Onward to
+  <a href="#v2intro"><b>Weekend 2 →</b></a></p>
+</section>
+
+<h2 style="margin-top:40px" id="v2intro">🛰️ Weekend 2 — "Cyborg Takes Command" (v2)</h2>
+<div class="panel">
+  <p>v1 is a calendar. <b>v2 turns the whole portrait screen into a household command center</b>:
+  weather and today's meal up top, the calendar in the middle, and a <b>touch</b> chore chart plus
+  the week's meal plan along the bottom. The touchscreen comes alive — tap to check off chores,
+  swipe to change weeks.</p>
+  <p class="meta">📌 <b>How to read this chapter.</b> v2 is the <b>next level</b> — a clearly-scoped
+  blueprint that builds on the exact code you already shipped in v1. It keeps the same rules
+  (read-only, no API keys, and the <b>theming never reacts to your data</b>). Each zone is an
+  independent add-on, so you can build just the ones you want. Where you see
+  <span class="pill v2">V2 BLUEPRINT</span>, that's a design + step plan to implement next, on top of
+  v1's seams — not something that's already in the box.</p>
+</div>
+
+<section id="v2arch">
+  <h3>The zoned portrait layout</h3>
+  <div class="svgwrap"><pre>┌───────────────────────────── 1080 wide ─────────────────────────────┐
+│  TOP ZONE   ·  Weather now + today's high/low   ·  🍽 Meal of the day │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  MIDDLE (anchor)  ·  The v1 calendar / agenda — unchanged            │
+│                                                                      │
+├──────────────────────────────────────────────────────────────────────┤
+│  BOTTOM ZONE  ·  ✅ Chore chart (tap to check)  ·  🗓 Week's meals    │
+└──────────────────────────────────────────────────────────────────────┘
+                 (portrait, 1920 tall · swipe ←/→ to change week)</pre></div>
+  <p>v2 reuses v1's architecture: the Python service keeps fetching/caching, and the kiosk keeps
+  painting <b>local</b> data only (so the Pi 3B stays smooth). We add three small, independent data
+  sources and three new screen panels.</p>
+  <h4>Where it plugs into the v1 code (the seams)</h4>
+  <table>
+    <tr><th>v2 add-on</th><th>Backend seam</th><th>Frontend seam</th></tr>
+    <tr><td>Weather + meal-of-day</td><td>New module <code>cyborg_core/weather.py</code> caching one Open-Meteo response; expose under a new <code>/api/hub</code> field</td><td>New <code>renderTopZone()</code> in <code>app.js</code>; a CSS grid row above the agenda</td></tr>
+    <tr><td>Chores (touch)</td><td>Read/write a local <code>chores.json</code> on the USB stick via a tiny <code>/api/chores</code> POST (the only write Cyborg ever does — to its <i>own</i> file, never your calendar)</td><td>Tap handler toggles done/undone; optimistic update + POST</td></tr>
+    <tr><td>Week's meals</td><td>Read <code>meals.json</code> on the USB stick</td><td>Bottom panel + swipe-week gesture reusing the agenda's date math</td></tr>
+  </table>
+  <div class="warnbox"><b>The one unbreakable rule still holds.</b> Even in v2, the Cyborg theming and
+    the BOOYAH voice <b>never</b> read or react to the <i>content</i> of your events, chores, or meals.
+    Celebrations fire only on fixed system events. (v1 ships a grep-able test that enforces this; add
+    the same test for any new theming code.)</div>
+  <p class="warnbox" style="border-color:var(--cyan);color:var(--cyan2)"><b>Heads-up:</b> none of the
+  v2 files/endpoints below (<code>cyborg_core/weather.py</code>, <code>/api/hub</code>,
+  <code>/api/chores</code>, <code>chores.json</code>, <code>meals.json</code>) exist in the repo yet —
+  they are the <b>blueprint</b> for Weekend&nbsp;2, built on v1's seams. v1 is the complete, tested,
+  shipped build.</p>
+</section>
+
+<section id="v2weather">
+  <h3>Zone 1 — Weather + meal of the day <span class="pill v2">V2 BLUEPRINT</span></h3>
+  <p><b>Weather</b> uses <b>Open-Meteo</b> — a free service that needs <b>no API key</b> (keeps our
+  "no keys" rule). The service fetches it next to the calendar, caches the last response, and shows a
+  friendly "weather is resting" state if it can't reach it — never blocking the calendar.</p>
+  <ol>
+    <li>Add <code>cyborg_core/weather.py</code>: fetch <code>https://api.open-meteo.com/v1/forecast?latitude=..&amp;longitude=..&amp;current=temperature_2m,weather_code&amp;daily=temperature_2m_max,temperature_2m_min</code>, parse to a small dict, cache last-good + timestamp (reuse v1's atomic store pattern).</li>
+    <li>Add your latitude/longitude + an optional <code>meal_of_day</code> source to <code>config.local.toml</code>.</li>
+    <li>Expose it: add a <code>weather</code> + <code>meal</code> block to the agenda/hub JSON.</li>
+    <li>Frontend: a top CSS-grid row showing temp, hi/lo, an icon (system font/emoji — no heavy images), and "Tonight: spaghetti 🍝".</li>
+  </ol>
+  <div class="know">the top of the screen shows the current temperature and today's meal, and if Wi-Fi
+    drops it shows the last known weather with a small "stale" mark — the calendar never even flickers.</div>
+</section>
+
+<section id="v2chores">
+  <h3>Zone 2 — Chore chart you can tap <span class="pill v2">V2 BLUEPRINT</span></h3>
+  <p>This is where the <b>touchscreen</b> shines. Each kid has chores; tap to check one off and Cyborg
+  saves it. Cyborg's only "write" is to its <b>own</b> <code>chores.json</code> on the USB stick — it
+  still never writes to your Apple calendar.</p>
+  <ol>
+    <li>Create <code>/mnt/cyborg/cyborg-cache/chores.json</code>: a list of <code>{id, who, label, done, day}</code>.</li>
+    <li>Backend: <code>GET /api/chores</code> returns it; <code>POST /api/chores</code> toggles a <code>done</code> flag and atomically rewrites the file (reuse v1's temp→fsync→replace writer).</li>
+    <li>Frontend: render check-rows per kid; a tap flips the box instantly and POSTs the change; reconcile on the next poll.</li>
+    <li>Touch was already calibrated in v1 (the 4-corner matrix), so taps land where you expect.</li>
+  </ol>
+  <div class="safebox">🟡 Keep it light: plain checkboxes and text, no animations — remember the Pi 3B
+    performance budget. A tap is a class toggle + one tiny POST, nothing heavier.</div>
+  <div class="know">a kid taps their "feed the dog" box, it fills in, and it's still checked after the
+    screen refreshes — Cyborg remembered. 🐶✅</div>
+</section>
+
+<section id="v2meals">
+  <h3>Zone 3 — The week's meals + swipe weeks <span class="pill v2">V2 BLUEPRINT</span></h3>
+  <ol>
+    <li>Create <code>/mnt/cyborg/cyborg-cache/meals.json</code>: <code>{date: "dinner text"}</code> for the week.</li>
+    <li>Backend: include the current + next week's meals in the hub JSON.</li>
+    <li>Frontend: a bottom strip of 7 day-cards; a left/right <b>swipe</b> moves to the next/previous week (reuse the agenda's date math from v1's <code>app.js</code>).</li>
+  </ol>
+  <div class="know">the bottom of the screen shows this week's dinners, and swiping flips to next week.
+    Now Cyborg really does "run the household." <span class="cy">BOOYAH!</span></div>
+  <h4>v2 acceptance (when you've leveled up)</h4>
+  <div class="panel">
+    <div class="step"><input type="checkbox" data-k="v2-1"><div>Top zone shows weather + today's meal, degrading gracefully offline.</div></div>
+    <div class="step"><input type="checkbox" data-k="v2-2"><div>Calendar (the v1 surface) still anchors the middle, unchanged.</div></div>
+    <div class="step"><input type="checkbox" data-k="v2-3"><div>Tapping a chore checks it off and it persists across refreshes.</div></div>
+    <div class="step"><input type="checkbox" data-k="v2-4"><div>Swiping changes the meal week.</div></div>
+    <div class="step"><input type="checkbox" data-k="v2-5"><div>The §13 theming test still passes for any new theming code (no branching on content).</div></div>
+    <div class="step"><input type="checkbox" data-k="v2-6"><div>Still smooth on the Pi 3B (DOM-light, animation-free).</div></div>
+  </div>
+</section>
+
+<section id="v2cert">
+  <div class="cert">
+    <div style="font-size:13px;letter-spacing:6px;color:var(--cyan2)">ADVANCED COMMAND CERTIFICATE</div>
+    <h2 style="font-size:28px">🏆 Cyborg Takes Command (v2) 🏆</h2>
+    <p>Awarded to the crew who turned a calendar into a full household command center — weather,
+    meals, and a tap-to-check chore chart — without ever breaking the rules.</p>
+    <p class="meta">Cyborg says: <b>"BOOYAH! You don't just run the house — you command it."</b></p>
+  </div>
+</section>
+
+<section id="trouble">
+  <h2>🛟 Troubleshooting HQ</h2>
+  <p>Start here whenever something's off. Cyborg's <code>/health</code> page
+  (<code>http://cyborg.local:8765/health</code>) is your best friend — it usually tells you exactly
+  which part is unhappy.</p>
+  <details class="oops"><summary>The screen is totally blank / black</summary>
+    Open <code>http://cyborg.local:8765/health</code> on your phone. <b>It loads</b> → the brain is fine;
+    it's a display problem: check the HDMI cable, the monitor's selected input, and that the Pi shows a
+    rainbow splash on boot. <b>It doesn't load</b> → the Pi or service is down: check power
+    (<code>undervoltage</code> lightning-bolt), and on a keyboard run
+    <code>systemctl status cyborg-fetch</code>.</details>
+  <details class="oops"><summary>It says "waking up / syncing" forever</summary>
+    No calendar data yet. Check <code>/health</code> → <code>fetch.last_error</code>. Usually a bad ICS
+    link (must start with <code>https://</code>) or no internet. Paste your link into a browser — it
+    should download a <code>.ics</code> file.</details>
+  <details class="oops"><summary>"Running on backup memory" chip won't go away</summary>
+    Cyborg can't reach the internet, so it's showing the last saved copy (good — not blank!). Check
+    Wi-Fi: <code>ping -c3 raspberrypi.com</code>. Re-enter Wi-Fi via <code>sudo raspi-config</code> if
+    needed. Once back online it refreshes within a few minutes.</details>
+  <details class="oops"><summary>A lightning bolt appears / random freezes</summary>
+    Under-voltage. Use the <b>official 5&nbsp;V/2.5&nbsp;A</b> supply and a good cable.
+    <code>vcgencmd get_throttled</code> should be <code>0x0</code>. Avoid powering the speaker or extras
+    from the Pi's USB.</details>
+  <details class="oops"><summary>Events are in the wrong time / wrong day</summary>
+    Set <code>home_tz</code> correctly in <code>config.local.toml</code> (e.g. <code>America/Chicago</code>),
+    and make sure the DS3231 clock is set (<code>sudo hwclock -w</code> while online). Restart with
+    <code>sudo systemctl restart cyborg-fetch</code>.</details>
+  <details class="oops"><summary>The kiosk shows a desktop / mouse cursor / address bar</summary>
+    Re-run <code>sudo ./scripts/setup.sh</code> (safe to repeat). It installs the kiosk autostart,
+    hides the cursor (<code>unclutter</code>), and launches Chromium in full-screen kiosk mode.</details>
+  <details class="oops"><summary>BOOYAH never plays</summary>
+    Open <code>http://cyborg.local:8765/assets/booyah.mp3</code> — it must play. If it 404s, the file
+    isn't at <code>/opt/cyborg-core/web/assets/booyah.mp3</code>. Then check the speaker power + jack and
+    <code>do_audio 1</code>.</details>
+  <details class="oops"><summary>How do I update Cyborg later?</summary>
+    Cyborg doesn't auto-update (safer for a family appliance). To update: <code>cd ~/onward-cyborg
+    &amp;&amp; git pull</code>, then <code>sudo ./scripts/setup.sh</code> and
+    <code>sudo systemctl restart cyborg-fetch</code>.</details>
+</section>
+
+<section id="cmds">
+  <h2>⌨️ Command cheat-sheet</h2>
+  <table>
+    <tr><th>Do this</th><th>Command</th></tr>
+    <tr><td>Check temperature</td><td><code>vcgencmd measure_temp</code></td></tr>
+    <tr><td>Check power health</td><td><code>vcgencmd get_throttled</code> (want <code>0x0</code>)</td></tr>
+    <tr><td>Find the RTC clock</td><td><code>sudo i2cdetect -y 1</code> (want <code>68</code>)</td></tr>
+    <tr><td>Read / set the RTC</td><td><code>sudo hwclock -r</code> / <code>sudo hwclock -w</code></td></tr>
+    <tr><td>Find the Pi's IP</td><td><code>hostname -I</code></td></tr>
+    <tr><td>See the service status</td><td><code>systemctl status cyborg-fetch --no-pager</code></td></tr>
+    <tr><td>Restart the service</td><td><code>sudo systemctl restart cyborg-fetch</code></td></tr>
+    <tr><td>See service logs</td><td><code>journalctl -u cyborg-fetch -n 50 --no-pager</code></td></tr>
+    <tr><td>List disks (find USB)</td><td><code>lsblk</code> / <code>blkid</code></td></tr>
+    <tr><td>Health page</td><td><code>http://cyborg.local:8765/health</code></td></tr>
+    <tr><td>Re-run provisioning</td><td><code>sudo ./scripts/setup.sh</code> (idempotent)</td></tr>
+    <tr><td>Clean shutdown</td><td>hold the GPIO17 button ~2s, or <code>sudo shutdown -h now</code></td></tr>
+  </table>
+</section>
+
+<section id="badges">
+  <h2>🎖️ Badge &amp; sticker checklist</h2>
+  <p>Tick a badge as each crew member earns it. Collect them all to unlock the certificate!</p>
+  <div class="panel">
+    <div class="step"><input type="checkbox" data-k="b1"><div><span class="badge">⚡ Spark of Life</span> — first boot &amp; Wi-Fi (Mission 1)</div></div>
+    <div class="step"><input type="checkbox" data-k="b2"><div><span class="badge">❄️ Cool Customer</span> — fan &amp; heatsinks (Mission 2)</div></div>
+    <div class="step"><input type="checkbox" data-k="b3"><div><span class="badge">❤️ Heartbeat</span> — RTC clock (Mission 3)</div></div>
+    <div class="step"><input type="checkbox" data-k="b4"><div><span class="badge">🧠 Brain Online</span> — code &amp; calendar (Mission 4)</div></div>
+    <div class="step"><input type="checkbox" data-k="b5"><div><span class="badge">💾 Backup Memory</span> — USB cache (Mission 5)</div></div>
+    <div class="step"><input type="checkbox" data-k="b6"><div><span class="badge">🧍 Stand Tall</span> — portrait kiosk (Mission 6)</div></div>
+    <div class="step"><input type="checkbox" data-k="b7"><div><span class="badge">🔊 The Voice</span> — BOOYAH audio (Mission 7)</div></div>
+    <div class="step"><input type="checkbox" data-k="b8"><div><span class="badge">🧲 Master of the Mount</span> — on the wall (Mission 8)</div></div>
+    <div class="step"><input type="checkbox" data-k="b9"><div><span class="badge">🔘 The Big Red Button</span> — power button (Mission 9)</div></div>
+    <div class="step"><input type="checkbox" data-k="b10"><div><span class="badge">🛰️ Commander</span> — completed a v2 zone</div></div>
+  </div>
+  <p style="text-align:center;color:var(--dim)">Built with the Omnigent relay loop · Cyborg is a
+  Teen Titans Go character; this is a private, non-commercial family build. No trademarked art ships
+  in the project — add your own locally.</p>
+</section>
+
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="cyborg-tutorial-progress-v1";
+  function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};} }
+  function save(s){ try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){} }
+  var state=load();
+  var boxes=Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  function updateProgress(){
+    var done=boxes.filter(function(b){return b.checked;}).length;
+    var el=document.getElementById('progress');
+    if(el){ el.textContent=done+' / '+boxes.length+' steps done'+(done===boxes.length&&boxes.length?'  — BOOYAH! 🎉':''); }
+  }
+  boxes.forEach(function(b){
+    var k=b.getAttribute('data-k');
+    if(state[k]){ b.checked=true; }
+    b.addEventListener('change',function(){ state[k]=b.checked; save(state); updateProgress(); });
+  });
+  updateProgress();
+  window.cyResetProgress=function(){
+    if(!confirm('Clear all your ticked steps on this device?'))return;
+    state={}; save(state); boxes.forEach(function(b){b.checked=false;}); updateProgress();
+  };
+  // Print/PDF must show ALL recovery text: force every <details> open before printing, then restore.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('details').forEach(function(d){ d.dataset._open=d.open?'1':'0'; d.open=true; });
+  });
+  window.addEventListener('afterprint',function(){
+    document.querySelectorAll('details').forEach(function(d){ d.open=(d.dataset._open==='1'); });
+  });
+})();
+</script>
+</body>
+</html>
