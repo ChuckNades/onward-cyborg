@@ -159,7 +159,8 @@
   <h2>How to use this guide</h2>
   <div class="panel">
     <p>Read every step <b>in order</b>. Do not skip ahead. Each step gives you the <b>exact</b>
-    command to type, what you should see, and what to do if it goes sideways. You need <b>zero</b>
+    command to type and what you should see; every mission — and every step that can trip you up —
+    has a green ✅ check and a 🛟 fix. You need <b>zero</b>
     prior Linux or Raspberry&nbsp;Pi knowledge — we explain everything.</p>
     <ul>
       <li>📦 <b>Boxes you'll see:</b></li>
@@ -314,7 +315,7 @@ celebrate-it build. (Weekend&nbsp;2 is an optional level-up.)</p>
     <div class="step"><input type="checkbox" data-k="m1-5"><div>Plug in keyboard + the monitor (HDMI) for now. Plug in Pi <b>power last</b>. The green light blinks — Cyborg is booting!</div></div>
     <div class="step"><input type="checkbox" data-k="m1-6"><div>Log in as <code>pi</code> with your password. Then update everything:
       <pre><code>sudo apt update &amp;&amp; sudo apt full-upgrade -y
-sudo apt install -y git
+sudo apt install -y git python3-venv python3-pip
 ping -c 3 raspberrypi.com</code></pre></div></div>
     <div class="know">you see a login prompt that says <code>cyborg login:</code>, you log in, and the <code>ping</code> shows replies (Cyborg is on the internet). <span class="cy">BOOYAH — Cyborg is alive!</span></div>
     <details class="oops"><summary>🛟 If it didn't… no Wi-Fi / ping fails</summary>
@@ -394,11 +395,18 @@ sudo hwclock -w        # write current time to the RTC</code></pre></div></div>
   <div class="mbody">
     <p>Now we put Cyborg's software on the Pi and give it your calendar link(s). First we'll run it
     by hand to prove it works, then later missions make it start automatically.</p>
-    <div class="step"><input type="checkbox" data-k="m4-1"><div>Get the code onto the Pi and step inside:
-      <pre><code>cd ~
-git clone &lt;your onward-cyborg repo URL or copy the folder here&gt; onward-cyborg
-cd onward-cyborg</code></pre>
-      <span class="meta">No remote? Copy the project folder onto the Pi with a USB stick into <code>~/onward-cyborg</code>.</span></div></div>
+    <div class="step"><input type="checkbox" data-k="m4-1"><div>Get the project folder onto the Pi. Pick the line that matches how you have it, then run the <code>ls</code> check:
+      <pre><code># Option A — it's on a USB stick (the part after /media/pi/ is the stick's name):
+cp -r /media/pi/*/onward-cyborg ~/onward-cyborg
+
+# Option B — copy from another computer on the same Wi-Fi (run this ON that computer):
+#   scp -r ~/forge/onward-cyborg  pi@cyborg.local:~/onward-cyborg
+
+# Option C — you host it in git:
+#   git clone &lt;your repo url&gt; ~/onward-cyborg
+
+cd ~/onward-cyborg
+ls cyborg_core      # you should see config.py  server.py  service.py …</code></pre></div></div>
     <div class="step"><input type="checkbox" data-k="m4-2"><div>Make Cyborg's settings file from the example, then open it to edit:
       <pre><code>cp config.example.toml config.local.toml
 nano config.local.toml</code></pre></div></div>
@@ -427,14 +435,17 @@ color = "#F58518"</code></pre>
       <pre><code>.venv/bin/python -m cyborg_core --config config.local.toml</code></pre>
       Leave it running. On the Pi (or another computer on the same Wi-Fi) open a browser to
       <code>http://cyborg.local:8765/</code> (or <code>http://&lt;the Pi's IP&gt;:8765/</code>).</div></div>
-    <div class="know">the browser shows the dark blue Cyborg calendar with your events, and
-      <code>http://cyborg.local:8765/health</code> shows a page of green-ish status (fetch ok, clock,
-      etc.). Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop it for now. <span class="cy">BOOYAH!</span></div>
-    <details class="oops"><summary>🛟 If it didn't… "waking up / syncing" never goes away</summary>
-      That screen means Cyborg has no calendar data yet. Check your <code>url</code> lines really start
-      with <code>https://</code> (not <code>webcal://</code>), and paste one link straight into a browser
-      to confirm it downloads a <code>.ics</code> file. Look at the terminal for a red error line, and
-      open <code>/health</code> — the <code>fetch.last_error</code> field tells you what went wrong.</details>
+    <div class="know"><code>http://cyborg.local:8765/health</code> opens and shows a page of status
+      fields (raw JSON) including <code>"fetch": {"ok": true …}</code> — that means Cyborg reached your
+      calendar. The calendar page itself may say <b>"waking up / syncing"</b> for now — <b>that's expected</b>:
+      Cyborg needs the memory stick from Mission&nbsp;5 before it can save and show events. Press
+      <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it for now. <span class="cy">BOOYAH — the brain works!</span></div>
+    <details class="oops"><summary>🛟 If it didn't… <code>/health</code> shows <code>"fetch": {"ok": false}</code></summary>
+      Cyborg couldn't read your calendar. Check your <code>url</code> lines really start with
+      <code>https://</code> (not <code>webcal://</code>), and paste one link straight into a browser to
+      confirm it downloads a <code>.ics</code> file. The <code>fetch.last_error</code> field on
+      <code>/health</code> (and any red line in the terminal) tells you exactly what went wrong.
+      (A "waking up / syncing" calendar screen at this stage is normal — that's fixed in Mission&nbsp;5.)</details>
     <details class="oops"><summary>🛟 If it didn't… "cyborg.local" won't load</summary>
       Find the Pi's IP with <code>hostname -I</code> and use <code>http://THAT-IP:8765/</code> instead.
       Make sure the other computer is on the <b>same Wi-Fi</b>.</details>
@@ -456,7 +467,12 @@ color = "#F58518"</code></pre>
     <div class="step"><input type="checkbox" data-k="m5-2"><div>Format it as Linux <b>ext4</b> and give it the label <b>CYBORG</b> (the setup script looks for this label):
       <pre><code>sudo umount /dev/sda1 2&gt;/dev/null || true
 sudo mkfs.ext4 -L CYBORG /dev/sda1</code></pre>
-      Type <code>y</code> if it asks to proceed.</div></div>
+      Type <code>y</code> if it asks to proceed.
+      <details class="oops"><summary>🛟 If it didn't… "device is busy" or you can't find sda1</summary>
+        Run <code>lsblk</code> again. The USB is the one whose size matches your stick — usually
+        <code>sda1</code>, <b>never</b> <code>mmcblk0</code> (that's the SD card with the OS!). "Busy"
+        means it's mounted: run the <code>sudo umount</code> line first. If your stick shows as
+        <code>sdb1</code> instead, use that name everywhere in this mission.</details></div></div>
     <div class="step"><input type="checkbox" data-k="m5-3"><div>Mount it now to test, make the cache folder, and check the UUID:
       <pre><code>sudo mkdir -p /mnt/cyborg
 sudo mount /dev/sda1 /mnt/cyborg
@@ -469,9 +485,10 @@ blkid /dev/sda1     # shows UUID=... LABEL="CYBORG"</code></pre></div></div>
 sleep 8
 ls -l /mnt/cyborg/cyborg-cache/    # you should see last-known-good.json
 kill %1</code></pre></div></div>
-    <div class="know"><code>blkid</code> shows <code>LABEL="CYBORG"</code>, and after running, a file
-      <code>last-known-good.json</code> appears in <code>/mnt/cyborg/cyborg-cache/</code>. That's Cyborg's
-      backup memory. 🧠💾</div>
+    <div class="know"><code>blkid</code> shows <code>LABEL="CYBORG"</code>; after running, a file
+      <code>last-known-good.json</code> appears in <code>/mnt/cyborg/cyborg-cache/</code>; and now the
+      calendar page at <code>http://cyborg.local:8765/</code> finally shows <b>your events</b> — Cyborg
+      has a place to save them. That's the backup memory. 🧠💾</div>
     <details class="oops"><summary>🛟 If it didn't… no <code>last-known-good.json</code></summary>
       Cyborg only writes the cache when it has fetched real events, and only writes when something
       changed. Make sure your calendar links work (Mission 4) and give it ~10 seconds. Check
@@ -533,14 +550,22 @@ systemctl status cyborg-fetch.service --no-pager</code></pre>
     code (and tested!). It's also rate-limited so it's a treat, not a nuisance.</p>
     <div class="step"><input type="checkbox" data-k="m7-1"><div>Plug the powered speaker into the Pi's <b>3.5&nbsp;mm</b> jack and turn it on. Force audio out of that jack:
       <pre><code>sudo raspi-config nonint do_audio 1   # 1 = 3.5mm headphone jack
-amixer set Master 90%</code></pre></div></div>
-    <div class="step"><input type="checkbox" data-k="m7-2"><div>Add a BOOYAH sound. The repo ships <b>no</b> copyrighted audio, so you drop your own clip into a
-      special <b>local</b> folder (never committed to the project):
-      <pre><code>sudo mkdir -p /opt/cyborg-core/web/assets
-sudo cp ~/my-booyah.mp3 /opt/cyborg-core/web/assets/booyah.mp3
+amixer set Master 90%</code></pre>
+      <span class="meta">On newer Raspberry Pi OS you can instead choose the output in
+      <code>sudo raspi-config</code> → <b>System Options → Audio</b>, then test with
+      <code>speaker-test -t wav -c 2</code> (<kbd>Ctrl</kbd>+<kbd>C</kbd> to stop).</span></div></div>
+    <div class="step"><input type="checkbox" data-k="m7-2"><div>Give Cyborg a sound. The repo ships <b>no</b> audio, so we make our own chime right on the Pi (you
+      can swap in a real "Booyah!" recording later). It must live in this <b>local</b> folder — it's
+      never committed to the project:
+      <pre><code>sudo apt install -y sox libsox-fmt-mp3
+sudo mkdir -p /opt/cyborg-core/web/assets
+# make a cheerful two-note chime as booyah.mp3:
+sudo sox -n /opt/cyborg-core/web/assets/booyah.mp3 synth 0.18 sine 660 synth 0.28 sine 990 vol 0.6
 sudo chown -R pi:pi /opt/cyborg-core/web/assets</code></pre>
-      <span class="meta">Want a face for Cyborg too? Drop an image at
-      <code>/opt/cyborg-core/web/assets/cyborg-mark.png</code> — it replaces the placeholder "C".</span></div></div>
+      <span class="meta">Prefer your own voice? Record one and save it to the same path:
+      <code>arecord -d 2 -f cd booyah.wav</code> then <code>sox booyah.wav /opt/cyborg-core/web/assets/booyah.mp3</code>.
+      Want a face for Cyborg too? Drop an image at <code>/opt/cyborg-core/web/assets/cyborg-mark.png</code>
+      — it replaces the placeholder "C".</span></div></div>
     <div class="step"><input type="checkbox" data-k="m7-3"><div>Make the BOOYAH fire on the next wake-up:
       <pre><code>sudo systemctl restart cyborg-fetch.service
 # then reload the kiosk page (or sudo reboot)</code></pre></div></div>
@@ -688,7 +713,12 @@ Press = clean shutdown (a tiny service watches GPIO17).</pre></div>
   <div class="warnbox"><b>The one unbreakable rule still holds.</b> Even in v2, the Cyborg theming and
     the BOOYAH voice <b>never</b> read or react to the <i>content</i> of your events, chores, or meals.
     Celebrations fire only on fixed system events. (v1 ships a grep-able test that enforces this; add
-    the same test for any new theming code.)</p></div>
+    the same test for any new theming code.)</div>
+  <p class="warnbox" style="border-color:var(--cyan);color:var(--cyan2)"><b>Heads-up:</b> none of the
+  v2 files/endpoints below (<code>cyborg_core/weather.py</code>, <code>/api/hub</code>,
+  <code>/api/chores</code>, <code>chores.json</code>, <code>meals.json</code>) exist in the repo yet —
+  they are the <b>blueprint</b> for Weekend&nbsp;2, built on v1's seams. v1 is the complete, tested,
+  shipped build.</p>
 </section>
 
 <section id="v2weather">
@@ -857,6 +887,13 @@ Press = clean shutdown (a tiny service watches GPIO17).</pre></div>
     if(!confirm('Clear all your ticked steps on this device?'))return;
     state={}; save(state); boxes.forEach(function(b){b.checked=false;}); updateProgress();
   };
+  // Print/PDF must show ALL recovery text: force every <details> open before printing, then restore.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('details').forEach(function(d){ d.dataset._open=d.open?'1':'0'; d.open=true; });
+  });
+  window.addEventListener('afterprint',function(){
+    document.querySelectorAll('details').forEach(function(d){ d.open=(d.dataset._open==='1'); });
+  });
 })();
 </script>
 </body>
