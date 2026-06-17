@@ -1,0 +1,37 @@
+CYBORG — DELIVERABLE COMPLETE (relay loop, no human in the loop)
+
+The Cyborg family-calendar wall-display deliverable is built, sandbox-tested, and committed to
+`main`. It is an infallible + fun weekend build tutorial (v1 calendar appliance + v2 household-hub
+blueprint) plus all the sandbox-tested code it references and labeled wiring/assembly diagrams —
+authored by the Omnigent relay loop. In headless mode (claude_code unavailable) the relay ran
+implementer = codex / cross-vendor reviewer = gemini (gemini-2.5-flash), with the claude
+orchestrator casting the grade and authoring prose; where gemini was transiently down, codex served
+as the independent cross-vendor reviewer. Every artifact went through the chain (author → review →
+fix → grade → approve), 1–3 cycles each, with the full exchange captured in .loop-ledger/. Real
+cross-vendor catches drove fixes: a §13 theming-isolation loophole in the kiosk (gemini), a
+boot-integration failure in provisioning — no autologin/startx, nologin kiosk user (gemini), and
+six tutorial command-order/runtime bugs incl. venv ordering, cache-before-events, and a
+kill-before-check (codex). Backend cyborg-core: stdlib-only ICS fetch/cache (icalendar +
+recurring-ical-events), all §12 event cases, atomic USB→microSD last-known-good store, staleness
+tiers, /api/agenda + /health, §13-clean BOOYAH signaling with a grep-able invariant. Frontend:
+vanilla DOM-light, animation-free portrait kiosk, never-blank, §13 grep-enforced. Provisioning:
+runtime entrypoint + systemd units + idempotent setup.sh (autologin→startx→openbox→kiosk, USB
+LABEL=CYBORG, gpu_mem=128, §I Chromium flags). 33/33 tests pass on main.
+
+BRANCH: main (all work merged). Feature branches retained: design/seed-decisions,
+impl/wiring-diagrams, impl/cyborg-core, impl/kiosk-frontend, impl/provisioning, impl/tutorial.
+
+KEY FILES (all tracked on main):
+- DELIVERABLE (tutorial): docs/tutorial/index.html (offline web, v1 9 missions + v2 blueprint,
+  kid roles/badges/2 certificates, embedded wiring, print/PDF), docs/tutorial/README.md
+- WIRING DIAGRAMS: docs/diagrams/wiring.md
+- BACKEND: cyborg_core/{__init__,__main__,config,parser,server,service,signals,staleness,store}.py
+  + requirements.txt + config.example.toml
+- FRONTEND (kiosk): web/{index.html,style.css,app.js,theme.js}
+- PROVISIONING: scripts/setup.sh, scripts/shutdown_button.py,
+  deploy/openbox/autostart, deploy/systemd/cyborg-fetch.service,
+  deploy/systemd/cyborg-screen-{off,on}.{service,timer}, deploy/systemd/cyborg-shutdown-button.service
+- TESTS (33, offline): tests/test_{parser,store,staleness_signals,http_service,static_routes,
+  frontend_invariant,provisioning}.py + tests/fixtures/*.ics
+- LOOP LEDGER (cross-model corpus): .loop-ledger/00-seed-decisions, 01-cyborg-core,
+  02-kiosk-frontend, 03-provisioning, 04-tutorial (.md + .jsonl), 07-wiring-diagrams.jsonl
