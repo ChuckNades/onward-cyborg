@@ -6,7 +6,17 @@ host = "127.0.0.1"
 port = 8765
 
 [cache]
-primary_path = "/mnt/cyborg/cyborg-cache/last-known-good.json"
+# Both paths must point at directories that EXIST and are writable, or the
+# last-known-good store silently no-ops and the kiosk hangs on the syncing
+# splash (store.py write_if_changed returns False without writing/raising when
+# the primary parent dir is missing).
+#
+# primary_path was historically "/mnt/cyborg/cyborg-cache/..." assuming a
+# separate USB device. On a single-SD-card build (e.g. Pi 5 / Touch Display 2,
+# SD via USB reader as the boot disk) nothing mounts at /mnt/cyborg — treat all
+# storage as the one card. Point primary at an on-disk dir you create, e.g.:
+#   sudo mkdir -p /opt/cyborg-core/cache && sudo chown pi /opt/cyborg-core/cache
+primary_path = "/opt/cyborg-core/cache/last-known-good.json"
 fallback_path = "/opt/cyborg-core/fallback/last-known-good.json"
 
 [behavior]
