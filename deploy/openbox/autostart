@@ -9,8 +9,13 @@ xrandr --output "$HDMI_OUTPUT" --rotate left || true
 xinput set-prop "$TOUCH_DEVICE" "Coordinate Transformation Matrix" 0 -1 1 1 0 0 0 0 1 || true
 unclutter -idle 0.5 -root &
 
+# NOTE: an autologin kiosk never unlocks the GNOME login keyring, so without
+# --password-store=basic Chromium throws a keyring-unlock dialog over the kiosk.
+# (On Pi OS trixie the binary is `chromium`, not `chromium-browser` — reconcile
+# during the Pi 5 / Touch Display 2 provisioning pass; see docs/deploy-notes.md.)
 chromium-browser \
   --kiosk \
+  --password-store=basic \
   --noerrdialogs \
   --disable-infobars \
   --incognito \

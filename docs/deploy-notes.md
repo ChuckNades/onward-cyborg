@@ -38,6 +38,52 @@ cd ~/onward-cyborg && .venv/bin/python -m cyborg_core --config config.local.toml
 `.venv/bin/cyborg_core` does not exist. `config.local.toml` is git-ignored and
 carries the live iCloud read credential — never commit it, never echo the URL.
 
+## Display orientation (LOCKED: portrait, panel-native)
+
+Panel = Touch Display 2, 7" DSI, **portrait-native 720×1280**. v1 runs portrait
+with **no rotation** — the kiosk fills the panel's native orientation directly.
+
+- `web/style.css` is sized in `vw` units against a 1080-wide design that is the
+  SAME 9:16 aspect as 720×1280, so it scales to fill any portrait DSI panel with
+  zero overflow. `index.html` viewport is `width=device-width` (was a hardcoded
+  `width=1080`, the v1 overflow cause).
+- The `xrandr --output "$HDMI_OUTPUT" --rotate left` + Acer touch matrix lines in
+  `deploy/openbox/autostart` are **no-ops on this hardware** — they target
+  `HDMI-1` / `Acer UT222Q`, but the panel is DSI. That is *why* portrait "just
+  works." They are retained only because the current test suite asserts them
+  (see reconciliation debt below); do not rely on them.
+
+## Serving model (why a git pull deploys the UI)
+
+`cyborg.service` runs from `~/onward-cyborg` (the git checkout), so the Python
+server serves `web/` live from the working tree. UI fixes therefore deploy by:
+`git pull` on the Pi → reload Chromium (or `sudo systemctl restart cyborg` if the
+backend changed). No re-provision needed for `web/` changes.
+
+## OPEN: Pi 5 / Touch Display 2 provisioning reconciliation (debt)
+
+`scripts/setup.sh`, `deploy/openbox/autostart`, and `tests/test_provisioning.py`
+still encode the ORIGINAL Pi 3B + Acer UT222Q target and have NOT been re-run on
+the current hardware (the live Pi was hand-provisioned). Stale assumptions:
+
+- USB cache mount at `/mnt/cyborg` (fiction on single-SD-card build; `config.example.toml`
+  was repointed to `/opt/cyborg-core/cache`, but `setup.sh` still creates/mounts
+  `/mnt/cyborg` and the contract test asserts it).
+- `chromium-browser` binary (trixie ships `chromium`).
+- Landscape→portrait rotation + Acer touch matrix (no-ops; the panel is DSI portrait-native).
+
+These are intentionally NOT silently rewritten: re-targeting them changes the
+test contract and cannot be validated without a full re-provision on the Pi.
+Treat as the next provisioning pass, validated on hardware before the repo claims
+it works (forge-build SOP: authored is not shipped).
+
+## Note: store.py is Linux-only
+
+`cyborg_core/store.py` uses `os.O_DIRECTORY` to fsync the cache dir after atomic
+write — POSIX-only. The suite is 33/33 on the Pi (Linux); on Windows 4 store/http
+tests fail with `AttributeError: module 'os' has no attribute 'O_DIRECTORY'`.
+Expected; the runtime target is the Pi.
+
 ## Deploy rule
 
 Git is the source of truth. The Pi changes only via `git pull`: develop on the
