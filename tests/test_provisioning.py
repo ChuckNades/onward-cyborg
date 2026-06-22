@@ -56,11 +56,10 @@ def _unit(name: str) -> configparser.ConfigParser:
     return parser
 
 
-def _run_setup_dry(tmp_path: Path, blkid_body: str) -> subprocess.CompletedProcess[str]:
+def _run_setup_dry(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    # The Pi 5 model needs no USB/blkid probing; only a kiosk-user home lookup.
     fakebin = tmp_path / "bin"
     fakebin.mkdir()
-    (fakebin / "blkid").write_text(blkid_body, encoding="utf-8")
-    (fakebin / "blkid").chmod(0o755)
     (fakebin / "getent").write_text(
         '#!/usr/bin/env bash\n'
         'if [[ "$1" == "passwd" && "$2" == "reviewer" ]]; then\n'
@@ -111,17 +110,21 @@ def test_run_cycles_refreshes_deterministically_and_serves_agenda(tmp_path):
     assert payload["events"][0]["title"] == "Field Day"
 
 
-def test_systemd_units_have_required_directives():
-    fetch = _unit("cyborg-fetch.service")
-    assert fetch["Unit"]["After"] == "network-online.target"
-    assert fetch["Unit"]["Wants"] == "network-online.target"
-    assert fetch["Service"]["ExecStart"] == "/opt/cyborg-core/.venv/bin/python -m cyborg_core --config /etc/cyborg/config.local.toml"
-    assert fetch["Service"]["Restart"] == "always"
-    assert fetch["Service"]["RestartSec"] == "5"
-    assert fetch["Service"]["User"] == "cyborg"
-    assert fetch["Service"]["WorkingDirectory"] == "/opt/cyborg-core"
-    assert fetch["Service"]["NoNewPrivileges"] == "true"
+def test_cyborg_service_unit_has_required_directives():
+    # The validated live unit: runs from the checkout as the kiosk user.
+    unit = _unit("cyborg.service")
+    assert unit["Unit"]["After"] == "network-online.target"
+    assert unit["Unit"]["Wants"] == "network-online.target"
+    assert unit["Service"]["ExecStart"] == "/home/pi/onward-cyborg/.venv/bin/python -m cyborg_core --config config.local.toml"
+    assert unit["Service"]["WorkingDirectory"] == "/home/pi/onward-cyborg"
+    assert unit["Service"]["User"] == "pi"
+    assert unit["Service"]["Restart"] == "always"
+    assert unit["Install"]["WantedBy"] == "multi-user.target"
 
+
+def test_optional_appliance_units_remain_available_but_unwired():
+    # Screen on/off + shutdown-button units are KEPT in the repo as opt-in features
+    # (not installed by setup.sh; not yet hardware-validated). They must still parse.
     for name in (
         "cyborg-screen-off.service",
         "cyborg-screen-on.service",
@@ -130,96 +133,67 @@ def test_systemd_units_have_required_directives():
         unit = _unit(name)
         assert unit["Service"]["ExecStart"]
 
-    for name in ("cyborg-screen-off.service", "cyborg-screen-on.service"):
-        text = (SYSTEMD / name).read_text(encoding="utf-8")
-        assert "User=@CYBORG_KIOSK_USER@" in text
-        assert "Environment=XAUTHORITY=@CYBORG_KIOSK_HOME@/.Xauthority" in text
-
     for name in ("cyborg-screen-off.timer", "cyborg-screen-on.timer"):
         timer = _unit(name)
         assert timer["Timer"]["OnCalendar"]
-        assert timer["Timer"]["Persistent"] == "true"
         assert timer["Install"]["WantedBy"] == "timers.target"
 
 
-def test_openbox_autostart_contains_portrait_touch_and_exact_chromium_flags():
-    text = (ROOT / "deploy" / "openbox" / "autostart").read_text(encoding="utf-8")
-    assert "xrandr --output \"$HDMI_OUTPUT\" --rotate left" in text
-    assert '"Coordinate Transformation Matrix" 0 -1 1 1 0 0 0 0 1' in text
-    assert "unclutter" in text
-    assert "http://127.0.0.1:8765/" in text
-    for flag in (
+def test_xdg_autostart_launcher_is_the_kiosk_entry():
+    text = (ROOT / "deploy" / "autostart" / "cyborg-kiosk.desktop").read_text(encoding="utf-8")
+    assert "[Desktop Entry]" in text
+    assert "X-GNOME-Autostart-enabled=true" in text
+    for token in (
+        "chromium ",
         "--kiosk",
-        "--noerrdialogs",
-        "--disable-infobars",
-        "--incognito",
-        "--disable-extensions",
-        "--disable-gpu-compositing",
-        "--disable-features=Translate",
-        "--check-for-update-interval=31536000",
-        "--overscroll-history-navigation=0",
-        "--force-device-scale-factor=1",
+        "--password-store=basic",
+        "--start-fullscreen",
+        "http://localhost:8765/",
     ):
-        assert flag in text
+        assert token in text, f"launcher missing {token}"
+    # Old-model artifacts must be gone from the launcher.
+    assert "chromium-browser" not in text
+    assert "xrandr" not in text
+    assert "--incognito" not in text
 
 
 def test_setup_script_contract_and_shellcheck_if_available():
     script = ROOT / "scripts" / "setup.sh"
     text = script.read_text(encoding="utf-8")
+    # New, validated Pi 5 model.
     assert "set -euo pipefail" in text
     assert "--dry-run" in text
-    assert "UUID=${USB_UUID} ${MOUNT_POINT} ext4 nofail,noatime 0 2" in text
-    assert "gpu_mem=128" in text
-    assert "raspi-config nonint do_i2c 0" in text
-    assert "--no-index --find-links" in text
-    assert "vcgencmd get_throttled" in text
-    assert "CYBORG_KIOSK_USER=\"${CYBORG_KIOSK_USER:-pi}\"" in text
-    assert "getty@tty1.service.d/override.conf" in text
-    assert "--autologin ${CYBORG_KIOSK_USER}" in text
-    assert 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then exec startx; fi' in text
-    assert "exec openbox-session" in text
-    assert '"${CYBORG_KIOSK_HOME}/.config/openbox/autostart"' in text
-    assert '"/home/${CYBORG_USER}/.config/openbox/autostart"' not in text
-    assert "blkid -t LABEL=CYBORG -o value -s UUID" in text
-    assert "Multiple ext4 filesystems detected" in text
+    assert "dtoverlay=vc4-kms-dsi-ili9881-7inch,rotation=90" in text
+    assert "autologin-user=${KIOSK_USER}" in text
+    assert "deploy/autostart/cyborg-kiosk.desktop" in text
+    assert "/etc/systemd/system/cyborg.service" in text
+    assert "apt-get install -y chromium" in text
+    assert "/opt/cyborg-core/cache" in text or 'CACHE_DIR="${CYBORG_CACHE_DIR:-/opt/cyborg-core/cache}"' in text
+    # Old Pi 3B + Acer model must be gone from OPERATIVE code (comments may still
+    # name what was dropped, so check non-comment lines only).
+    code = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+    for banned in ("/mnt/cyborg", "gpu_mem", "do_i2c", "agetty", "startx", "openbox-session", "blkid", "xrandr", "chromium-browser"):
+        assert banned not in code, f"old-model artifact still operative: {banned}"
     if shutil.which("shellcheck") is None:
         return
     result = subprocess.run(["shellcheck", str(script)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_setup_dry_run_generates_kiosk_boot_path_and_rendered_screen_units(tmp_path):
-    result = _run_setup_dry(
-        tmp_path,
-        '#!/usr/bin/env bash\n'
-        'if [[ "$*" == *"LABEL=CYBORG"* ]]; then echo "label-uuid"; exit 0; fi\n'
-        'if [[ "$*" == *"TYPE=ext4"* ]]; then echo "other-uuid"; exit 0; fi\n'
-        'exit 0\n',
-    )
-
+def test_setup_dry_run_generates_kiosk_boot_path_and_service(tmp_path):
+    result = _run_setup_dry(tmp_path)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "UUID=label-uuid /mnt/cyborg ext4 nofail,noatime 0 2" in result.stdout
-    assert "ExecStart=-/sbin/agetty --autologin reviewer --noclear %I $TERM" in result.stdout
-    assert 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then exec startx; fi' in result.stdout
-    assert "exec openbox-session" in result.stdout
-    assert "/home/reviewer/.config/openbox/autostart" in result.stdout
-    assert "/home/cyborg/.config/openbox/autostart" not in result.stdout
-    assert "Environment=XAUTHORITY=/home/reviewer/.Xauthority" in result.stdout
-    assert "User=reviewer" in result.stdout
-    assert "Boot path configured: autologin tty1 (reviewer) -> startx -> openbox-session -> Openbox autostart -> Chromium kiosk." in result.stdout
-
-
-def test_setup_usb_selection_errors_on_ambiguous_ext4_without_cyborg_label(tmp_path):
-    result = _run_setup_dry(
-        tmp_path,
-        '#!/usr/bin/env bash\n'
-        'if [[ "$*" == *"LABEL=CYBORG"* ]]; then exit 0; fi\n'
-        'if [[ "$*" == *"TYPE=ext4"* ]]; then printf "uuid-one\\nuuid-two\\n"; exit 0; fi\n'
-        'exit 0\n',
-    )
-
-    assert result.returncode == 1
-    assert "Multiple ext4 filesystems detected and none is labeled CYBORG" in result.stderr
+    out = result.stdout
+    assert "apt-get install -y chromium" in out
+    assert "ensure line in /boot/firmware/config.txt: dtoverlay=vc4-kms-dsi-ili9881-7inch,rotation=90" in out
+    assert "ensure line in /etc/lightdm/lightdm.conf: autologin-user=reviewer" in out
+    assert "/home/reviewer/.config/autostart/cyborg-kiosk.desktop" in out
+    assert "write /etc/systemd/system/cyborg.service" in out
+    assert "systemctl enable cyborg.service" in out
+    assert "Boot model: lightdm autologin (reviewer)" in out
+    # No USB / console-autologin model.
+    assert "/mnt/cyborg" not in out
+    assert "agetty" not in out
 
 
 def test_shutdown_button_imports_without_rpi_gpio(monkeypatch):

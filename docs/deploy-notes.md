@@ -91,26 +91,35 @@ server serves `web/` live from the working tree. UI fixes therefore deploy by:
 re-provision needed for `web/` changes — confirmed: the v1 layout fix deployed
 this way (`a86a38c`) and was visually verified.
 
-## OPEN: Pi 5 / Touch Display 2 provisioning reconciliation (debt)
+## Provisioning reconciliation (DONE 2026-06-21, re-target; re-provision pending)
 
-`scripts/setup.sh`, `deploy/openbox/autostart`, and `tests/test_provisioning.py`
-still encode the ORIGINAL Pi 3B + Acer UT222Q target and have NOT been re-run on
-the current hardware (the live Pi was hand-provisioned). Stale assumptions:
+`scripts/setup.sh` + `tests/test_provisioning.py` were re-targeted from the old
+Pi 3B + Acer UT222Q model to the validated Pi 5 + Touch Display 2 model:
 
-- USB cache mount at `/mnt/cyborg` (fiction on single-SD-card build; `config.example.toml`
-  was repointed to `/opt/cyborg-core/cache`, but `setup.sh` still creates/mounts
-  `/mnt/cyborg` and the contract test asserts it).
-- `chromium-browser` binary (live launcher uses `chromium`).
-- `xrandr --rotate left` + Acer touch matrix (the live Pi rotates at KMS via
-  `config.txt rotation=90`, not via xrandr; the openbox-autostart rotation is dead).
-- The whole openbox/startx provisioning path in `setup.sh` does not match the
-  live Pi, which uses RPi OS Desktop + lxsession + the XDG-autostart launcher
-  (`deploy/autostart/cyborg-kiosk.desktop`). See "Kiosk launch model" above.
+- **Storage:** single SD — `/opt/cyborg-core/{cache,fallback}`. Dropped the USB
+  `/mnt/cyborg` mount + `blkid`/fstab probing.
+- **Browser:** `chromium` (was `chromium-browser`).
+- **Display:** portrait via KMS `rotation=90` in `config.txt`. Dropped `gpu_mem`
+  (Pi 5 ignores it), `do_i2c` (off on the live Pi), and the `xrandr`/touch-matrix
+  rotation.
+- **Boot/kiosk:** lightdm desktop autologin (`autologin-user=pi`) + XDG autostart
+  (`deploy/autostart/cyborg-kiosk.desktop`). Dropped the console-autologin →
+  `startx` → `openbox-session` → openbox-autostart path.
+- **Service:** `deploy/systemd/cyborg.service` (runs from the checkout as the
+  kiosk user) — the validated live unit. Removed the stale `cyborg-fetch.service`
+  (`/opt/cyborg-core`, `cyborg` user, `/mnt/cyborg`) and `deploy/openbox/autostart`.
 
-These are intentionally NOT silently rewritten: re-targeting them changes the
-test contract and cannot be validated without a full re-provision on the Pi.
-Treat as the next provisioning pass, validated on hardware before the repo claims
-it works (forge-build SOP: authored is not shipped).
+**Validation:** the full suite passes on the Pi (Linux), and the setup.sh dry-run
+output is asserted by the contract tests. NOT yet validated by an actual
+wipe-and-reprovision (that would destroy the working unit) — per the forge SOP,
+the first clean re-provision is the final proof. The live Pi remains hand-set-up.
+
+**Kept but unwired (opt-in, not yet hardware-validated):** the overnight screen
+on/off timers (`deploy/systemd/cyborg-screen-*`) and GPIO17 shutdown button
+(`deploy/systemd/cyborg-shutdown-button.service`, `scripts/shutdown_button.py`).
+These are real v1 design features but reference old-model details (HDMI-1,
+`.Xauthority`) and the Pi 5 has an onboard power button. Wire them in only after a
+real provision + a hardware test (e.g. confirm the screen actually blanks at 22:00).
 
 ## Note: store.py is Linux-only
 

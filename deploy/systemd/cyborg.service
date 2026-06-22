@@ -1,0 +1,17 @@
+[Unit]
+Description=Cyborg core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Runs from the git checkout as the kiosk user — the validated live model
+# (verified on hardware 2026-06-21). setup.sh rewrites User/WorkingDirectory/
+# ExecStart to the actual checkout path at install time.
+User=pi
+WorkingDirectory=/home/pi/onward-cyborg
+ExecStart=/home/pi/onward-cyborg/.venv/bin/python -m cyborg_core --config config.local.toml
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
