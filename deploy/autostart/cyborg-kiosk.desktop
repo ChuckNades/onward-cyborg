@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cyborg Kiosk
+# The ACTIVE kiosk launcher on the live Pi (RPi OS Desktop -> lxsession -> XDG
+# autostart). Verified on hardware 2026-06-21. Install to:
+#   ~/.config/autostart/cyborg-kiosk.desktop
+# Portrait is handled at KMS (config.txt: dtoverlay=...,rotation=90) — NOT here.
+# --password-store=basic: an autologin kiosk never unlocks the GNOME keyring, so
+# without it Chromium can throw a keyring-unlock dialog over the kiosk.
+Exec=chromium --kiosk --password-store=basic --noerrdialogs --disable-infobars --start-fullscreen --check-for-update-interval=31536000 http://localhost:8765/
+X-GNOME-Autostart-enabled=true

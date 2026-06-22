@@ -38,27 +38,58 @@ cd ~/onward-cyborg && .venv/bin/python -m cyborg_core --config config.local.toml
 `.venv/bin/cyborg_core` does not exist. `config.local.toml` is git-ignored and
 carries the live iCloud read credential — never commit it, never echo the URL.
 
-## Display orientation (LOCKED: portrait, panel-native)
+## Display orientation (DECIDED: v1 ships portrait via KMS rotation=90)
 
-Panel = Touch Display 2, 7" DSI, **portrait-native 720×1280**. v1 runs portrait
-with **no rotation** — the kiosk fills the panel's native orientation directly.
+**Decision (Pete, 2026-06-21): v1 ships in PORTRAIT.** Portrait was the plan for
+the larger display; a later landscape build on a smaller display was discussed.
+That orientation choice is **deferred to future builds** — do not reopen it for
+v1. The running, visually-verified state is portrait, and v1 locks it.
+
+Portrait 720×1280 is produced by a **kernel (KMS) display rotation**, verified on
+hardware 2026-06-21:
+
+```
+# /boot/firmware/config.txt
+dtoverlay=vc4-kms-dsi-ili9881-7inch,rotation=90
+```
+
+**This line is load-bearing — do NOT remove it.** It is what rotates the panel
+into portrait; the rendered UI was visually confirmed good with it present. The
+panel scans landscape natively, so `rotation=90` is required for portrait.
 
 - `web/style.css` is sized in `vw` units against a 1080-wide design that is the
-  SAME 9:16 aspect as 720×1280, so it scales to fill any portrait DSI panel with
+  SAME 9:16 aspect as 720×1280, so it fills the rotated portrait surface with
   zero overflow. `index.html` viewport is `width=device-width` (was a hardcoded
   `width=1080`, the v1 overflow cause).
-- The `xrandr --output "$HDMI_OUTPUT" --rotate left` + Acer touch matrix lines in
-  `deploy/openbox/autostart` are **no-ops on this hardware** — they target
-  `HDMI-1` / `Acer UT222Q`, but the panel is DSI. That is *why* portrait "just
-  works." They are retained only because the current test suite asserts them
-  (see reconciliation debt below); do not rely on them.
+- **No compositor/xrandr rotation is used** (rotation is done once, at KMS).
+  Stacking an `xrandr --rotate` on top of `rotation=90` would double-rotate.
+- A future landscape build would: drop `rotation=90` (or set it to suit the mount),
+  and re-target `style.css` to 1280×720 — a future-build task, not a v1 one.
+
+## Kiosk launch model (verified on hardware)
+
+The live Pi runs **Raspberry Pi OS Desktop → lxsession → openbox (WM) → Xorg
+(X11, `DISPLAY=:0`)**, and the kiosk is launched by an **XDG autostart** entry,
+NOT the bespoke openbox/startx path in `setup.sh`:
+
+```
+~/.config/autostart/cyborg-kiosk.desktop   # the ACTIVE launcher
+  Exec=chromium --kiosk --start-fullscreen ... http://localhost:8765/
+```
+
+Canonical copy tracked at `deploy/autostart/cyborg-kiosk.desktop`. Two other
+autostart files exist on the Pi but are **inert** (not the active launcher) and
+should be ignored / cleaned up: `~/.config/openbox/autostart` (`chromium-browser`,
+never fires under lxsession) and `~/.config/labwc/autostart` (Wayland; this
+session is X11).
 
 ## Serving model (why a git pull deploys the UI)
 
 `cyborg.service` runs from `~/onward-cyborg` (the git checkout), so the Python
 server serves `web/` live from the working tree. UI fixes therefore deploy by:
-`git pull` on the Pi → reload Chromium (or `sudo systemctl restart cyborg` if the
-backend changed). No re-provision needed for `web/` changes.
+`git pull` on the Pi → reload the kiosk (reboot, or relaunch Chromium). No
+re-provision needed for `web/` changes — confirmed: the v1 layout fix deployed
+this way (`a86a38c`) and was visually verified.
 
 ## OPEN: Pi 5 / Touch Display 2 provisioning reconciliation (debt)
 
@@ -69,8 +100,12 @@ the current hardware (the live Pi was hand-provisioned). Stale assumptions:
 - USB cache mount at `/mnt/cyborg` (fiction on single-SD-card build; `config.example.toml`
   was repointed to `/opt/cyborg-core/cache`, but `setup.sh` still creates/mounts
   `/mnt/cyborg` and the contract test asserts it).
-- `chromium-browser` binary (trixie ships `chromium`).
-- Landscape→portrait rotation + Acer touch matrix (no-ops; the panel is DSI portrait-native).
+- `chromium-browser` binary (live launcher uses `chromium`).
+- `xrandr --rotate left` + Acer touch matrix (the live Pi rotates at KMS via
+  `config.txt rotation=90`, not via xrandr; the openbox-autostart rotation is dead).
+- The whole openbox/startx provisioning path in `setup.sh` does not match the
+  live Pi, which uses RPi OS Desktop + lxsession + the XDG-autostart launcher
+  (`deploy/autostart/cyborg-kiosk.desktop`). See "Kiosk launch model" above.
 
 These are intentionally NOT silently rewritten: re-targeting them changes the
 test contract and cannot be validated without a full re-provision on the Pi.
